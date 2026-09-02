@@ -94,6 +94,14 @@ class FirebaseBackend {
     this.app = initializeApp(this.config);
     this.auth = authModule.getAuth(this.app);
     this.db = firestoreModule.getFirestore(this.app);
+    await new Promise(resolve => {
+      const unsubscribe = authModule.onAuthStateChanged(this.auth, user => {
+        this.user = user;
+        onUserChanged(user);
+        unsubscribe();
+        resolve(user);
+      });
+    });
     authModule.onAuthStateChanged(this.auth, user => {
       this.user = user;
       onUserChanged(user);
@@ -102,12 +110,10 @@ class FirebaseBackend {
     return true;
   }
 
-  async signIn(email, password) {
-    return this.authApi.signInWithEmailAndPassword(this.auth, email, password);
-  }
-
-  async signUp(email, password) {
-    const credential = await this.authApi.createUserWithEmailAndPassword(this.auth, email, password);
+  async signInWithGoogle() {
+    const provider = new this.authApi.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const credential = await this.authApi.signInWithPopup(this.auth, provider);
     await this.ensureUserProfile(credential.user);
     return credential;
   }
@@ -214,18 +220,17 @@ class RoadmapApp {
     }
 
     this.bindUi();
-    this.loadLocalActive();
     await this.initFirebase();
-    await this.tryOpenSharedUrl();
+    const openedShare = await this.tryOpenSharedUrl();
+    if(!openedShare && this.backend.user) this.loadLocalActive();
     this.bindAutosave();
   }
 
   collectElements() {
     const ids = [
       'backendStatus', 'diagramTitle', 'saveDiagramBtn', 'newDiagramBtn', 'dashboardBtn',
-      'shareDiagramBtn', 'authBox', 'userBox', 'authEmail', 'authPassword', 'signInBtn',
-      'signUpBtn', 'signOutBtn', 'dashboardModal', 'closeDashboardBtn', 'diagramList',
-      'shareBanner', 'stage'
+      'shareDiagramBtn', 'userBox', 'signOutBtn', 'dashboardModal', 'closeDashboardBtn',
+      'diagramList', 'shareBanner', 'stage', 'loginScreen', 'googleSignInBtn', 'loginStatus'
     ];
     return Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   }
@@ -236,8 +241,7 @@ class RoadmapApp {
     this.els.dashboardBtn.addEventListener('click', () => this.openDashboard());
     this.els.closeDashboardBtn.addEventListener('click', () => this.closeDashboard());
     this.els.shareDiagramBtn.addEventListener('click', () => this.shareCurrentDiagram());
-    this.els.signInBtn.addEventListener('click', () => this.signIn());
-    this.els.signUpBtn.addEventListener('click', () => this.signUp());
+    this.els.googleSignInBtn.addEventListener('click', () => this.signInWithGoogle());
     this.els.signOutBtn.addEventListener('click', () => this.signOut());
     this.els.diagramTitle.addEventListener('change', () => this.saveNow(false));
   }
@@ -252,19 +256,20 @@ class RoadmapApp {
 
   async initFirebase() {
     if(!this.backend.enabled) {
-      this.setStatus('محلي - أضف Firebase للتسجيل والمشاركة');
-      this.toggleAuth(false);
+      this.setStatus('Firebase غير مفعّل');
+      this.lockApp('أضف إعدادات Firebase في firebase-config.js لتفعيل تسجيل الدخول.');
       return;
     }
     try {
       this.setStatus('جاري اتصال Firebase...');
+      this.lockApp('جاري تجهيز تسجيل الدخول...');
       await this.backend.init(user => {
-        this.toggleAuth(Boolean(user), user);
-        this.setStatus(user ? `سحابي: ${user.email}` : 'Firebase جاهز - سجّل الدخول');
+        this.applyAuthState(user);
       });
     } catch(err) {
       console.error(err);
-      this.setStatus('تعذر تفعيل Firebase - يعمل محليًا');
+      this.setStatus('تعذر تفعيل Firebase');
+      this.lockApp('تعذر الاتصال بـ Firebase. راجع إعدادات المشروع والدومين المصرّح.');
     }
   }
 
@@ -284,23 +289,25 @@ class RoadmapApp {
   async tryOpenSharedUrl() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('share');
-    if(!token) return;
+    if(!token) return false;
     if(!this.backend.enabled || !this.backend.ready) {
       this.setStatus('رابط المشاركة يحتاج Firebase مفعّل');
-      return;
+      return false;
     }
     const shared = await this.backend.getSharedDiagram(token);
     if(!shared || !shared.documentJson) {
       this.setStatus('رابط المشاركة غير موجود أو غير متاح');
-      return;
+      return false;
     }
     this.currentId = shared.id;
     this.currentSource = 'share';
     this.readonly = shared.shareMode !== 'edit';
     this.els.diagramTitle.value = shared.title || 'خريطة مشتركة';
     this.editor.loadState(shared.documentJson);
+    this.unlockApp();
     if(this.readonly) this.enableReadonlyMode();
     this.setStatus('تم فتح رابط المشاركة');
+    return true;
   }
 
   enableReadonlyMode() {
@@ -450,35 +457,47 @@ class RoadmapApp {
     alert('تم إنشاء ونسخ رابط المشاركة:\n' + url.toString());
   }
 
-  async signIn() {
-    const { email, password } = this.readCredentials();
-    if(!email || !password) return alert('اكتب البريد وكلمة المرور.');
-    await this.backend.signIn(email, password);
-    await this.saveNow(false);
-  }
-
-  async signUp() {
-    const { email, password } = this.readCredentials();
-    if(!email || !password) return alert('اكتب البريد وكلمة المرور.');
-    await this.backend.signUp(email, password);
-    await this.saveNow(false);
+  async signInWithGoogle() {
+    try {
+      this.lockApp('جاري فتح Google...');
+      await this.backend.signInWithGoogle();
+      await this.saveNow(false);
+    } catch(err) {
+      console.error(err);
+      const cancelled = err && (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request');
+      this.lockApp(cancelled ? 'تم إلغاء تسجيل الدخول.' : 'تعذر تسجيل الدخول بجوجل. راجع تفعيل Google provider والدومين في Firebase.');
+    }
   }
 
   async signOut() {
     await this.backend.signOut();
+    this.lockApp('تم تسجيل الخروج. ادخل بحساب Google للمتابعة.');
   }
 
-  readCredentials() {
-    return {
-      email: this.els.authEmail.value.trim(),
-      password: this.els.authPassword.value
-    };
-  }
-
-  toggleAuth(isSignedIn, user) {
-    this.els.authBox.classList.toggle('hidden', isSignedIn || !this.backend.enabled);
+  applyAuthState(user) {
+    const isSignedIn = Boolean(user);
     this.els.userBox.classList.toggle('hidden', !isSignedIn);
-    if(user) this.backend.ensureUserProfile(user).catch(console.error);
+    if(user) {
+      this.backend.ensureUserProfile(user).catch(console.error);
+      this.unlockApp();
+      this.setStatus(`سحابي: ${user.email}`);
+      if(this.currentSource !== 'share') this.loadLocalActive();
+    } else if(this.currentSource !== 'share') {
+      this.lockApp('سجّل الدخول بحساب Google للبدء.');
+      this.setStatus('Firebase جاهز - سجّل الدخول');
+    }
+  }
+
+  lockApp(message) {
+    document.body.classList.add('auth-locked');
+    this.els.loginScreen.classList.remove('hidden');
+    this.els.loginStatus.textContent = message || '';
+  }
+
+  unlockApp() {
+    document.body.classList.remove('auth-locked');
+    this.els.loginScreen.classList.add('hidden');
+    this.els.loginStatus.textContent = '';
   }
 
   setStatus(text) {
