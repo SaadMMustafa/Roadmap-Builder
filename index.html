@@ -332,6 +332,69 @@
   .auth-grid input{ padding:8px 9px; font-size:12px; }
   .hidden{ display:none !important; }
 
+  .login-screen{
+    position:fixed; inset:0; z-index:90;
+    display:flex; align-items:center; justify-content:center;
+    padding:22px;
+    background:
+      linear-gradient(rgba(244,245,247,.88), rgba(244,245,247,.92)),
+      repeating-linear-gradient(0deg, transparent 0 23px, var(--grid-line) 23px 24px),
+      repeating-linear-gradient(90deg, transparent 0 23px, var(--grid-line) 23px 24px);
+  }
+  .login-card{
+    width:min(420px, 94vw);
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:14px;
+    box-shadow:0 24px 70px rgba(27,31,39,.2);
+    padding:22px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .login-card h1{
+    margin:0;
+    display:flex; align-items:center; gap:9px;
+    font-size:18px;
+  }
+  .login-card h1::before{
+    content:""; width:10px; height:10px; border-radius:50%;
+    background:var(--accent); flex-shrink:0;
+  }
+  .login-card p{
+    margin:0;
+    color:var(--text-dim);
+    font-size:13px;
+    line-height:1.8;
+  }
+  .google-btn{
+    width:100%;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:#fff;
+    color:var(--text);
+    border:1px solid var(--node-border);
+    min-height:44px;
+  }
+  .google-mark{
+    width:18px; height:18px; border-radius:50%;
+    display:inline-grid; place-items:center;
+    font-family:Arial, sans-serif; font-weight:700; font-size:14px;
+    color:#4285f4;
+  }
+  .login-status{
+    min-height:18px;
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:10px;
+    text-align:center;
+  }
+  body.auth-locked #toolbar,
+  body.auth-locked #topBar,
+  body.auth-locked #status,
+  body.auth-locked #zoom-ctl{
+    filter:blur(2px);
+    pointer-events:none;
+    user-select:none;
+  }
+
   .modal-backdrop{
     position:fixed; inset:0; z-index:60;
     background:rgba(27,31,39,.28);
@@ -395,7 +458,7 @@
   }
 </style>
 </head>
-<body>
+<body class="auth-locked">
 
 <div id="canvas-wrap">
   <div id="stage">
@@ -491,14 +554,6 @@
       <button class="btn-ghost" id="dashboardBtn" style="flex:1">مخططاتي</button>
       <button class="btn-accent" id="shareDiagramBtn" style="flex:1">مشاركة</button>
     </div>
-    <div class="auth-grid" id="authBox">
-      <input type="text" id="authEmail" placeholder="البريد الإلكتروني">
-      <input type="password" id="authPassword" placeholder="كلمة المرور">
-      <div class="row">
-        <button class="btn-primary" id="signInBtn" style="flex:1">دخول</button>
-        <button class="btn-ghost" id="signUpBtn" style="flex:1">تسجيل</button>
-      </div>
-    </div>
     <div class="row hidden" id="userBox">
       <button class="btn-ghost" id="signOutBtn" style="flex:1">خروج</button>
     </div>
@@ -574,6 +629,18 @@
 </div>
 
 <div class="share-banner hidden" id="shareBanner">وضع مشاركة للعرض فقط</div>
+
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h1>باني الخريطة</h1>
+    <p>سجّل الدخول بحساب Google عشان تحفظ خرائطك على Firebase وتفتحها من أي جهاز.</p>
+    <button class="google-btn" id="googleSignInBtn">
+      <span class="google-mark">G</span>
+      الدخول بحساب Google
+    </button>
+    <div class="login-status" id="loginStatus">جاري تجهيز تسجيل الدخول...</div>
+  </div>
+</div>
 
 <script>
 (function(){
