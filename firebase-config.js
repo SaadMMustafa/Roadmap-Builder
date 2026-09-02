@@ -8,3 +8,5 @@ export const firebaseConfig = {
   appId: "1:1071125400049:web:0503f8e50569f90d8e1c50",
   measurementId: "G-T1PR4L8RMZ"
 };
+
+export const ownerEmail = "saadmmstafa99@gmail.com";
