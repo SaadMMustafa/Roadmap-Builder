@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>باني المخططات — Roadmap Builder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg: #f4f5f7;
+    --grid-line: #dfe2e8;
+    --grid-line-strong: #cdd1da;
+    --panel: #ffffff;
+    --panel-border: #e3e5ea;
+    --line: #9aa1b0;
+    --accent: #e8542a;
+    --accent-dim: #e8542a22;
+    --mint: #0f9d72;
+    --mint-dim: #0f9d7220;
+    --text: #1b1f27;
+    --text-dim: #6b7280;
+    --node-bg: #ffffff;
+    --node-border: #d7dae1;
+    --font-display: 'IBM Plex Sans Arabic', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-display);
+    overflow:hidden;
+  }
+
+  #canvas-wrap{ position:fixed; inset:0; background:var(--bg); }
+
+  #stage{ position:absolute; inset:0; cursor:grab; }
+  #stage.panning{ cursor:grabbing; }
+
+  #world{
+    position:absolute; top:0; left:0;
+    transform-origin: 0 0;
+  }
+
+  /* الشبكة البيانية */
+  #grid{
+    position:absolute;
+    top:-6000px; left:-6000px;
+    width:12000px; height:12000px;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(var(--grid-line-strong) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line-strong) 1px, transparent 1px);
+    background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+    pointer-events:none;
+  }
+
+  svg#lines{
+    position:absolute; top:-6000px; left:-6000px;
+    width:12000px; height:12000px;
+    pointer-events:none; overflow:visible;
+  }
+
+  .edge{ fill:none; stroke:var(--line); stroke-width:2.5; transition: stroke .15s, stroke-width .15s; }
+  .edge.milestone{ stroke: var(--accent); }
+  .edge-group:hover .edge{ stroke:var(--mint); }
+  .edge-group.selected .edge{ stroke:var(--mint) !important; stroke-width:3.5; }
+  .edge-hit{ fill:none; stroke:transparent; stroke-width:22; pointer-events:stroke; cursor:crosshair; }
+  .edge-hit:active{ cursor:grabbing; }
+  .edge-handle{
+    fill:#fff; stroke:var(--mint); stroke-width:2;
+    pointer-events:all; cursor:grab;
+    opacity:0; transition: opacity .12s;
+  }
+  .edge-handle:active{ cursor:grabbing; }
+  .edge-group:hover .edge-handle, .edge-group.selected .edge-handle{ opacity:1; }
+
+  .node{
+    position:absolute;
+    background:var(--node-bg);
+    border:1.5px solid var(--node-border);
+    border-radius:10px;
+    box-shadow: 0 1px 3px #1b1f2712, 0 1px 2px #1b1f2712;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .node.milestone{ border-color: var(--accent); border-width:2px; }
+  .node.milestone::before{
+    content:""; position:absolute; top:-6px; right:-6px;
+    width:10px; height:10px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 0 3px var(--bg);
+  }
+  .node.selected{
+    box-shadow: 0 0 0 3px var(--mint-dim), 0 4px 14px #1b1f2720;
+  }
+  .node.hover-eff-lift:hover{ transform:translateY(-3px); border-color:var(--hover-c, var(--node-border)); box-shadow:0 8px 20px var(--hover-c-dim, #0f9d7233), 0 2px 6px #1b1f2714; }
+  .node.hover-eff-glow:hover{ border-color:var(--hover-c, var(--node-border)); box-shadow:0 0 0 5px var(--hover-c-dim, #0f9d7233), 0 4px 14px #1b1f2718; }
+  .node.hover-eff-pulse:hover{ border-color:var(--hover-c, var(--node-border)); animation: nodePulse 1.3s ease-in-out infinite; }
+  @keyframes nodePulse{
+    0%,100%{ box-shadow:0 0 0 0 var(--hover-c-dim, #0f9d7233); }
+    50%{ box-shadow:0 0 0 8px transparent; }
+  }
+
+  .node-text{
+    position:absolute; inset:0;
+    padding:10px 14px;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center;
+    font-size:14px; font-weight:600; line-height:1.5;
+    color:var(--text);
+    overflow:auto;
+    white-space:pre-wrap;
+    word-break:break-word;
+    cursor:grab;
+  }
+  .node-text:active{ cursor:grabbing; }
+  .node-edit{
+    position:absolute; inset:0;
+    padding:10px 14px;
+    font-family:var(--font-display);
+    font-size:14px; font-weight:600; line-height:1.5;
+    color:var(--text);
+    text-align:center;
+    background:#fffdf7;
+    border:none; outline:2px solid var(--mint);
+    border-radius:9px;
+    resize:none;
+  }
+
+  .badge{
+    position:absolute; bottom:6px; left:14px;
+    font-family:var(--font-mono); font-size:9.5px; font-weight:400;
+    color:var(--text-dim); pointer-events:none;
+  }
+
+  /* شارة الرابط: عنصر مرئي منفصل، ضغطة مباشرة ومتزامنة تفتح الرابط فورًا (بدون أي تأخير يصطدم بحاجب النوافذ المنبثقة) */
+  .link-badge{
+    position:absolute; top:-9px; left:-9px;
+    width:22px; height:22px; border-radius:50%;
+    background:#fff; border:1.5px solid var(--mint);
+    color:var(--mint); font-size:11px;
+    align-items:center; justify-content:center;
+    display:none; cursor:pointer; z-index:8;
+    box-shadow:0 2px 6px #1b1f2726;
+    transition: transform .12s;
+  }
+  .link-badge:hover{ transform:scale(1.15); }
+  .node[data-has-link="1"] .link-badge{ display:flex; }
+
+  /* منافذ الربط: لا تُصدَّر أبداً لأنها غير موجودة في نموذج البيانات المُصدَّر */
+  .port{
+    position:absolute; width:14px; height:14px; border-radius:50%;
+    background:#fff; border:2px solid var(--text-dim);
+    cursor:crosshair; z-index:6;
+    transition: transform .12s, border-color .12s, background .12s;
+  }
+  .port:hover{ transform:scale(1.35); border-color:var(--mint); background:var(--mint-dim); }
+  .port.n{ top:-8px; left:50%; transform:translateX(-50%); }
+  .port.s{ bottom:-8px; left:50%; transform:translateX(-50%); }
+  .port.w{ left:-8px; top:50%; transform:translateY(-50%); }
+  .port.e{ right:-8px; top:50%; transform:translateY(-50%); }
+  /* منافذ الزوايا: جوه العقدة شوية عشان متتصادمش بصريًا مع مقابض تغيير الحجم اللي برّه الزاوية */
+  .port.ne, .port.nw, .port.se, .port.sw{ width:11px; height:11px; }
+  .port.ne{ top:5px; right:5px; }
+  .port.nw{ top:5px; left:5px; }
+  .port.se{ bottom:5px; right:5px; }
+  .port.sw{ bottom:5px; left:5px; }
+
+  .resize-handle{
+    position:absolute;
+    background:#fff; border:2px solid var(--text-dim);
+    z-index:6;
+    opacity:0; transition: opacity .12s, border-color .12s;
+  }
+  .node:hover .resize-handle, .node.selected .resize-handle{ opacity:1; }
+  .resize-handle:hover{ border-color:var(--mint); }
+
+  .resize-handle.rh-ne, .resize-handle.rh-nw, .resize-handle.rh-se, .resize-handle.rh-sw{
+    width:12px; height:12px; border-radius:4px;
+  }
+  .resize-handle.rh-ne{ top:-7px; right:-7px; cursor:nesw-resize; }
+  .resize-handle.rh-nw{ top:-7px; left:-7px; cursor:nwse-resize; }
+  .resize-handle.rh-se{ bottom:-7px; right:-7px; cursor:nwse-resize; }
+  .resize-handle.rh-sw{ bottom:-7px; left:-7px; cursor:nesw-resize; }
+
+  /* شريط الأدوات */
+  #toolbar{
+    position:fixed; top:76px; right:20px; z-index:20;
+    display:flex; flex-direction:column; gap:10px;
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:14px; padding:16px; width:25vw; min-width:290px; max-width:420px;
+    box-shadow: 0 12px 28px #1b1f2718;
+    max-height:calc(100vh - 96px); overflow-y:auto;
+  }
+  #toolbar h1{ font-size:15px; margin:0 0 2px; display:flex; align-items:center; gap:8px; }
+  #toolbar h1 .dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); }
+  #toolbar h2{ font-size:11.5px; margin:8px 0 0; color:var(--text-dim); font-weight:600; letter-spacing:.02em; }
+  #toolbar p.hint{ margin:0 0 6px; font-size:11.5px; color:var(--text-dim); line-height:1.7; }
+  .row{ display:flex; gap:8px; }
+  input[type=text], input[type=password], input[type=number]{
+    flex:1; width:100%; background:#fbfbfc; border:1px solid var(--node-border);
+    color:var(--text); border-radius:8px; padding:9px 10px;
+    font-family:var(--font-display); font-size:13px; outline:none;
+  }
+  input[type=number]{ font-family:var(--font-mono); }
+  select{
+    flex:1; width:100%; background:#fbfbfc; border:1px solid var(--node-border);
+    color:var(--text); border-radius:8px; padding:9px 10px;
+    font-family:var(--font-display); font-size:13px; outline:none; cursor:pointer;
+  }
+  select:focus, input:focus{ border-color:var(--mint); background:#fff; }
+  button{
+    font-family:var(--font-display); font-weight:600; font-size:13px;
+    border:none; border-radius:8px; padding:9px 12px; cursor:pointer;
+    transition: filter .1s, transform .05s, background .1s;
+  }
+  button:active{ transform: scale(.96); }
+  .btn-primary{ background:var(--mint); color:#fff; }
+  .btn-primary:hover{ filter:brightness(1.08); }
+  .btn-accent{ background:var(--accent); color:#fff; }
+  .btn-accent:hover{ filter:brightness(1.08); }
+  .btn-ghost{ background:#fff; color:var(--text-dim); border:1px solid var(--node-border); }
+  .btn-ghost:hover{ color:var(--text); border-color:var(--text-dim); }
+  .btn-danger{ background:#fff; color:#c8402a; border:1px solid #c8402a44; }
+  .btn-danger:hover{ background:#c8402a10; }
+
+  .field-label{ font-size:11px; color:var(--text-dim); margin-bottom:-3px; }
+
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12.5px; color:var(--text-dim);
+    padding-top:8px; margin-top:2px; border-top:1px dashed var(--panel-border);
+  }
+  .switch{ width:34px; height:19px; border-radius:20px; background:var(--node-border); position:relative; cursor:pointer; flex-shrink:0; }
+  .switch::after{ content:""; position:absolute; top:2px; right:2px; width:15px; height:15px; border-radius:50%; background:#fff; box-shadow:0 1px 2px #0002; transition: right .15s, background .15s; }
+  .switch.on{ background:var(--mint-dim); }
+  .switch.on::after{ right:17px; background:var(--mint); }
+
+  hr.sep{ border:none; border-top:1px dashed var(--panel-border); margin:4px 0; }
+
+  .swatch-row{ display:flex; flex-wrap:wrap; gap:7px; margin:3px 0 2px; }
+  .swatch{
+    width:22px; height:22px; border-radius:50%; padding:0;
+    border:2px solid #fff; box-shadow:0 0 0 1px var(--node-border);
+    cursor:pointer; transition: transform .15s, box-shadow .15s;
+  }
+  .swatch:hover{ transform:scale(1.15); }
+  .swatch.active{
+    box-shadow:0 0 0 2px var(--mint);
+    animation: swatchPop .22s ease;
+  }
+  @keyframes swatchPop{
+    0%{ transform:scale(.65); }
+    60%{ transform:scale(1.25); }
+    100%{ transform:scale(1.08); }
+  }
+  input.swatch-custom{
+    width:22px; height:22px; border-radius:50%; padding:0;
+    border:2px dashed var(--text-dim); background:#fff; cursor:pointer;
+  }
+  input.swatch-custom::-webkit-color-swatch-wrapper{ padding:2px; }
+  input.swatch-custom::-webkit-color-swatch{ border:none; border-radius:50%; }
+
+  #status{
+    position:fixed; bottom:18px; right:20px; z-index:20;
+    font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+    background:var(--panel); border:1px solid var(--panel-border);
+    padding:8px 12px; border-radius:8px; display:flex; gap:14px;
+    box-shadow: 0 4px 14px #1b1f2712;
+  }
+  #status b{ color:var(--text); font-weight:600; }
+
+  #zoom-ctl{
+    position:fixed; bottom:18px; left:20px; z-index:20; display:flex; gap:6px;
+    background:var(--panel); border:1px solid var(--panel-border); padding:6px; border-radius:10px;
+    box-shadow: 0 4px 14px #1b1f2712;
+  }
+  #zoom-ctl button{ width:30px; height:30px; padding:0; background:transparent; color:var(--text-dim); font-size:16px; }
+  #zoom-ctl button:hover{ color:var(--text); background:#00000008; }
+  #zoom-ctl button:disabled{ opacity:.35; cursor:default; }
+  #zoom-ctl button:disabled:hover{ background:transparent; }
+  .ctl-sep{ width:1px; align-self:stretch; background:var(--panel-border); margin:2px 1px; }
+
+  ::selection{ background:var(--mint-dim); }
+
+  /* الشريط العلوي الثابت: يظهر باهتًا ومعطّلاً بدون تحديد، ويتفعّل بمجرد تحديد عنصر */
+  #topBar{
+    position:fixed; top:0; left:0; right:0; z-index:25;
+    background:var(--panel); border-bottom:1px solid var(--panel-border);
+    box-shadow: 0 4px 16px #1b1f2714;
+    padding:10px 20px;
+    transition: opacity .18s, filter .18s;
+  }
+  #topBar.disabled{ opacity:.5; filter:grayscale(.4); pointer-events:none; }
+  .topbar-inner{ display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
+  .topbar-title{ font-size:12px; color:var(--text-dim); font-weight:600; white-space:nowrap; }
+  .topbar-section{ display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+  .tb-group{ display:flex; align-items:center; gap:8px; }
+  .tb-label{ font-size:11px; color:var(--text-dim); white-space:nowrap; }
+  .tb-group select{ width:auto; min-width:130px; padding:6px 8px; font-size:12px; }
+
+  .swatch-reset{
+    width:22px; height:22px; border-radius:50%; padding:0; cursor:pointer;
+    background:
+      linear-gradient(45deg, transparent 46%, #c8402a 46%, #c8402a 54%, transparent 54%),
+      #fff;
+    border:2px solid var(--node-border);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .swatch-reset:hover{ transform:scale(1.15); }
+  .swatch-reset.active{ box-shadow:0 0 0 2px var(--mint); }
+
+  .app-panel{
+    display:flex; flex-direction:column; gap:8px;
+    padding:10px; border:1px solid var(--panel-border);
+    border-radius:10px; background:#fbfbfc;
+  }
+  .app-panel .mini-title{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    font-size:11px; color:var(--text-dim); font-weight:700;
+  }
+  .app-status{
+    font-family:var(--font-mono); font-size:10px; color:var(--text-dim);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .app-panel button{ padding:8px 10px; }
+  .auth-grid{ display:grid; grid-template-columns:1fr; gap:7px; }
+  .auth-grid input{ padding:8px 9px; font-size:12px; }
+  .hidden{ display:none !important; }
+
+  .modal-backdrop{
+    position:fixed; inset:0; z-index:60;
+    background:rgba(27,31,39,.28);
+    display:flex; align-items:center; justify-content:center;
+    padding:18px;
+  }
+  .modal{
+    width:min(760px, 94vw); max-height:86vh; overflow:auto;
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:14px; box-shadow:0 22px 60px rgba(27,31,39,.28);
+    padding:16px;
+  }
+  .modal-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .modal h2{ margin:0; font-size:16px; }
+  .diagram-list{ display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:10px; }
+  .diagram-card{
+    border:1px solid var(--panel-border); border-radius:10px; padding:12px;
+    background:#fbfbfc; display:flex; flex-direction:column; gap:8px;
+  }
+  .diagram-card strong{ font-size:13px; }
+  .diagram-card span{ font-size:11px; color:var(--text-dim); }
+  .diagram-card .row button{ flex:1; padding:7px 9px; font-size:12px; }
+  .share-banner{
+    position:fixed; top:12px; right:50%; transform:translateX(50%); z-index:70;
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
+    padding:8px 14px; box-shadow:0 6px 20px #1b1f2718;
+    font-size:12px; color:var(--text-dim);
+  }
+  body.share-readonly #toolbar,
+  body.share-readonly #topBar{ display:none; }
+
+  @media (max-width: 720px){
+    #topBar{
+      padding:8px 10px;
+      overflow-x:auto;
+      overflow-y:hidden;
+      min-height:66px;
+    }
+    .topbar-inner{
+      flex-wrap:nowrap;
+      width:max-content;
+      gap:14px;
+    }
+    .topbar-section{
+      flex-wrap:nowrap;
+      gap:12px;
+    }
+    #toolbar{
+      top:82px; right:10px; left:10px;
+      width:auto; min-width:0; max-width:none;
+      max-height:calc(100vh - 148px);
+      padding:14px;
+    }
+    #status{
+      right:10px; bottom:66px;
+      max-width:calc(100vw - 20px);
+      overflow:hidden;
+    }
+    #zoom-ctl{ left:10px; bottom:14px; }
+    .modal{ width:96vw; }
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <div id="stage">
+    <div id="world">
+      <div id="grid"></div>
+      <svg id="lines"><defs>
+        <marker id="arrow-sm" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+        <marker id="arrow-md" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+        <marker id="arrow-lg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="13" markerHeight="13" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+      </defs><g id="lines-g" transform="translate(6000,6000)"></g></svg>
+    </div>
+  </div>
+</div>
+
+<div id="topBar" class="disabled">
+  <div class="topbar-inner">
+    <span class="topbar-title" id="topBarTitle">حدد عقدة أو خط عشان تظبط مظهره من هنا</span>
+
+    <div class="topbar-section" id="nodeColorSection">
+      <div class="tb-group"><span class="tb-label">خلفية</span><div class="swatch-row" id="bgSwatches"></div></div>
+      <div class="tb-group"><span class="tb-label">نص</span><div class="swatch-row" id="textSwatches"></div></div>
+      <div class="tb-group"><span class="tb-label">إطار</span><div class="swatch-row" id="borderSwatches"></div></div>
+      <div class="tb-group"><span class="tb-label">هوفر</span><div class="swatch-row" id="hoverSwatches"></div></div>
+      <div class="tb-group">
+        <span class="tb-label">أنيميشن</span>
+        <select id="hoverEffectSelect">
+          <option value="none">بدون تأثير</option>
+          <option value="lift">رفع خفيف</option>
+          <option value="glow">توهج ناعم</option>
+          <option value="pulse">نبض</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="topbar-section" id="edgeColorSection" style="display:none">
+      <div class="tb-group"><span class="tb-label">لون الخط</span><div class="swatch-row" id="edgeColorSwatches"></div></div>
+      <div class="tb-group">
+        <span class="tb-label">شكل السهم</span>
+        <select id="arrowSelect">
+          <option value="none">بدون سهم</option>
+          <option value="end">للوجهة ←</option>
+          <option value="start">عكسي →</option>
+          <option value="both">الاتجاهين ↔</option>
+        </select>
+      </div>
+      <div class="tb-group">
+        <span class="tb-label">حجم رأس السهم</span>
+        <select id="arrowSizeSelect">
+          <option value="sm">صغير</option>
+          <option value="md">متوسط</option>
+          <option value="lg">كبير</option>
+        </select>
+      </div>
+      <div class="tb-group">
+        <span class="tb-label">شكل المسار</span>
+        <select id="pathStyleSelect">
+          <option value="curve">منحني (مقبض سحب)</option>
+          <option value="elbow">زوايا قائمة (Elbow)</option>
+        </select>
+      </div>
+      <div class="tb-group" id="elbowDirGroup" style="display:none">
+        <span class="tb-label">اتجاه زوايا Elbow</span>
+        <select id="elbowDirSelect">
+          <option value="auto">تلقائي</option>
+          <option value="h">جذع أفقي</option>
+          <option value="v">جذع رأسي</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toolbar">
+  <h1><span class="dot"></span> باني الخريطة</h1>
+  <p class="hint">اكتب عنوان الخطوة وأضِفها، بعدين انقر نقرتين على العقدة عشان تحرر النص بحرية. اسحب من مقابض الزوايا الأربعة لتغيير العرض/الطول. اسحب من أي نقطة اتصال (8 نقط حوالين كل عقدة) لعقدة تانية أو لخط موجود — نقطة الخروج والدخول بتتحدد بالظبط من مكان السحب والإفلات، من غير أي إعداد يدوي تاني. اسحب من أي مكان على خط موجود عشان تعمل منه تفريع لعقدة أو خط تالت، واسحب من دائرة المقبض الصغيرة عشان تعوجّه. حدد عقدة أو خط عشان تظبط ألوانه من الشريط فوق. Ctrl+Z للتراجع.</p>
+  <div class="app-panel" id="cloudPanel">
+    <div class="mini-title">
+      <span>المشروع والحفظ</span>
+      <span class="app-status" id="backendStatus">محلي</span>
+    </div>
+    <input type="text" id="diagramTitle" placeholder="اسم الخريطة" value="خريطة جديدة">
+    <div class="row">
+      <button class="btn-primary" id="saveDiagramBtn" style="flex:1">حفظ</button>
+      <button class="btn-ghost" id="newDiagramBtn" style="flex:1">جديد</button>
+    </div>
+    <div class="row">
+      <button class="btn-ghost" id="dashboardBtn" style="flex:1">مخططاتي</button>
+      <button class="btn-accent" id="shareDiagramBtn" style="flex:1">مشاركة</button>
+    </div>
+    <div class="auth-grid" id="authBox">
+      <input type="text" id="authEmail" placeholder="البريد الإلكتروني">
+      <input type="password" id="authPassword" placeholder="كلمة المرور">
+      <div class="row">
+        <button class="btn-primary" id="signInBtn" style="flex:1">دخول</button>
+        <button class="btn-ghost" id="signUpBtn" style="flex:1">تسجيل</button>
+      </div>
+    </div>
+    <div class="row hidden" id="userBox">
+      <button class="btn-ghost" id="signOutBtn" style="flex:1">خروج</button>
+    </div>
+  </div>
+  <div class="row">
+    <input type="text" id="nodeInput" placeholder="مثلاً: تعلّم المصفوفات...">
+  </div>
+  <div class="row">
+    <button class="btn-primary" id="addBtn" style="flex:1">+ إضافة عقدة</button>
+  </div>
+  <div class="toggle-row">
+    عقدة أساسية (Milestone)
+    <div class="switch" id="milestoneSwitch"></div>
+  </div>
+  <div class="toggle-row">
+    الالتزام بالشبكة (Snap)
+    <div class="switch on" id="snapSwitch"></div>
+  </div>
+
+  <div id="propsPanel" style="display:none">
+    <hr class="sep">
+    <h2>خصائص العقدة المحددة</h2>
+    <div class="row">
+      <div style="flex:1">
+        <div class="field-label">العرض (px)</div>
+        <input type="number" id="wInput" min="60" step="4">
+      </div>
+      <div style="flex:1">
+        <div class="field-label">الطول (px)</div>
+        <input type="number" id="hInput" min="34" step="4">
+      </div>
+    </div>
+
+    <div class="field-label" style="margin-top:6px">رابط العقدة (اختياري) — تظهر شارة 🔗 على العقدة، اضغط عليها لفتح الرابط</div>
+    <div class="row">
+      <input type="text" id="linkInput" placeholder="https://...">
+    </div>
+    <div class="field-label" style="margin-top:4px">الألوان والأنيميشن ظابطهم من الشريط فوق ⬆</div>
+  </div>
+
+  <div class="row" style="margin-top:2px">
+    <button class="btn-ghost" id="clearSelBtn" style="flex:1">إلغاء التحديد</button>
+    <button class="btn-danger" id="deleteBtn" style="flex:1">حذف المحدد</button>
+  </div>
+
+  <hr class="sep">
+  <button class="btn-accent" id="exportBtn">⬇ تصدير الخريطة (HTML+CSS+JS)</button>
+</div>
+
+<div id="status">
+  <span>عُقد: <b id="cNodes">0</b></span>
+  <span>روابط: <b id="cEdges">0</b></span>
+  <span id="modeLabel">جاهز</span>
+</div>
+
+<div id="zoom-ctl">
+  <button id="undoBtn" title="تراجع (Ctrl+Z)">↶</button>
+  <button id="redoBtn" title="إعادة (Ctrl+Shift+Z)">↷</button>
+  <div class="ctl-sep"></div>
+  <button id="zoomOut">−</button>
+  <button id="zoomReset" style="font-size:11px;">100%</button>
+  <button id="zoomIn">+</button>
+</div>
+
+<div class="modal-backdrop hidden" id="dashboardModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>مخططاتي</h2>
+      <button class="btn-ghost" id="closeDashboardBtn">إغلاق</button>
+    </div>
+    <div class="diagram-list" id="diagramList"></div>
+  </div>
+</div>
+
+<div class="share-banner hidden" id="shareBanner">وضع مشاركة للعرض فقط</div>
+
+<script>
+(function(){
+  const world = document.getElementById('world');
+  const stage = document.getElementById('stage');
+  const linesG = document.getElementById('lines-g');
+  const nodeInput = document.getElementById('nodeInput');
+  const addBtn = document.getElementById('addBtn');
+  const deleteBtn = document.getElementById('deleteBtn');
+  const clearSelBtn = document.getElementById('clearSelBtn');
+  const milestoneSwitch = document.getElementById('milestoneSwitch');
+  const snapSwitch = document.getElementById('snapSwitch');
+  const cNodesEl = document.getElementById('cNodes');
+  const cEdgesEl = document.getElementById('cEdges');
+  const modeLabel = document.getElementById('modeLabel');
+  const zoomOutBtn = document.getElementById('zoomOut');
+  const zoomInBtn = document.getElementById('zoomIn');
+  const zoomResetBtn = document.getElementById('zoomReset');
+  const propsPanel = document.getElementById('propsPanel');
+  const wInput = document.getElementById('wInput');
+  const hInput = document.getElementById('hInput');
+  const linkInput = document.getElementById('linkInput');
+  const hoverEffectSelect = document.getElementById('hoverEffectSelect');
+  const arrowSelect = document.getElementById('arrowSelect');
+  const arrowSizeSelect = document.getElementById('arrowSizeSelect');
+  const pathStyleSelect = document.getElementById('pathStyleSelect');
+  const elbowDirGroup = document.getElementById('elbowDirGroup');
+  const elbowDirSelect = document.getElementById('elbowDirSelect');
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const topBar = document.getElementById('topBar');
+  const topBarTitle = document.getElementById('topBarTitle');
+  const nodeColorSection = document.getElementById('nodeColorSection');
+  const edgeColorSection = document.getElementById('edgeColorSection');
+  const edgeColorSwatches = document.getElementById('edgeColorSwatches');
+
+  const EDGE_COLOR_PALETTE = ['#9aa1b0','#e8542a','#0f9d72','#2f6fed','#d1477a','#7c5cff','#1b1f27'];
+
+  const PALETTES = {
+    bg: ['#ffffff','#fff8ee','#eafbf4','#ffece3','#eaf3ff','#f3edff','#1b1f27'],
+    color: ['#1b1f27','#3c4353','#0f9d72','#e8542a','#1d3a8f','#6b7280','#ffffff'],
+    border: ['#d7dae1','#0f9d72','#e8542a','#1d3a8f','#d1477a','#9aa1b0'],
+    hoverColor: ['#0f9d72','#e8542a','#2f6fed','#d1477a','#7c5cff','#d99a1b']
+  };
+  const SWATCH_ROWS = [
+    { id:'bgSwatches', key:'bg' },
+    { id:'textSwatches', key:'color' },
+    { id:'borderSwatches', key:'border' },
+    { id:'hoverSwatches', key:'hoverColor' }
+  ];
+
+  const GRID = 24;
+  const DEFAULT_W = 180, DEFAULT_H = 64, MIN_W = 60, MIN_H = 34;
+
+  let nodes = {};   // id -> {el, textEl, x, y, w, h, milestone, text, z}
+  let edges = [];    // {id, from, to, pathEl, hitEl}
+  let nodeSeq = 1, edgeSeq = 1, zTop = 1;
+  let selectedNode = null;
+  let selectedEdge = null;
+  let isMilestoneMode = false;
+  let snapEnabled = true;
+
+  let scale = 1, panX = 60, panY = 60;
+  applyTransform();
+
+  function applyTransform(){
+    world.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+  }
+  function snap(v){ return snapEnabled ? Math.round(v / GRID) * GRID : v; }
+
+  // يقبل http/https/mailto فقط — يمنع روابط javascript: أو data: الخبيثة من التنفيذ عند الضغط أو بعد التصدير
+  function isSafeLink(url){
+    if(!url) return false;
+    try{
+      const parsed = new URL(url, window.location.href);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:';
+    } catch(err){
+      return false;
+    }
+  }
+
+  function hexToRgba(hex, alpha){
+    hex = String(hex || '#0f9d72').replace('#','');
+    if(hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
+    const r = parseInt(hex.substr(0,2),16) || 0;
+    const g = parseInt(hex.substr(2,2),16) || 0;
+    const b = parseInt(hex.substr(4,2),16) || 0;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function applyNodeStyle(id){
+    const node = nodes[id];
+    if(!node) return;
+    node.el.style.background = node.bg;
+    node.el.style.borderColor = node.border;
+    node.textEl.style.color = node.color;
+    node.el.style.setProperty('--hover-c', node.hoverColor);
+    node.el.style.setProperty('--hover-c-dim', hexToRgba(node.hoverColor, .35));
+    node.el.classList.remove('hover-eff-none','hover-eff-lift','hover-eff-glow','hover-eff-pulse');
+    node.el.classList.add('hover-eff-' + (node.hoverEffect || 'lift'));
+    node.el.dataset.hasLink = isSafeLink(node.link) ? '1' : '0';
+  }
+
+  function buildSwatchRow(containerEl, key){
+    containerEl.innerHTML = '';
+    PALETTES[key].forEach(color=>{
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch';
+      b.style.background = color;
+      b.dataset.color = color;
+      b.title = color;
+      b.addEventListener('click', ()=>{ if(!selectedNode) return; applyColorChoice(key, color); commitHistory(); });
+      containerEl.appendChild(b);
+    });
+    const custom = document.createElement('input');
+    custom.type = 'color';
+    custom.className = 'swatch swatch-custom';
+    custom.title = 'لون مخصص';
+    custom.addEventListener('input', ()=> applyColorChoice(key, custom.value));
+    custom.addEventListener('change', ()=> { if(selectedNode) commitHistory(); });
+    containerEl.appendChild(custom);
+    containerEl._customInput = custom;
+  }
+  SWATCH_ROWS.forEach(row=> buildSwatchRow(document.getElementById(row.id), row.key));
+
+  function applyColorChoice(key, color){
+    if(!selectedNode) return;
+    nodes[selectedNode][key] = color;
+    applyNodeStyle(selectedNode);
+    refreshSwatchSelection();
+  }
+
+  function refreshSwatchSelection(){
+    if(!selectedNode) return;
+    const node = nodes[selectedNode];
+    SWATCH_ROWS.forEach(row=>{
+      const container = document.getElementById(row.id);
+      container.querySelectorAll('.swatch').forEach(sw=>{
+        sw.classList.toggle('active', sw.dataset.color === node[row.key]);
+      });
+      if(container._customInput && /^#/.test(node[row.key])) container._customInput.value = node[row.key];
+    });
+    hoverEffectSelect.value = node.hoverEffect || 'lift';
+  }
+
+  // ================= الشريط العلوي الثابت: ألوان + أنيميشن + شكل السهم/المسار =================
+  function refreshTopBar(){
+    const hasNode = !!selectedNode, hasEdge = !!selectedEdge;
+    topBar.classList.toggle('disabled', !hasNode && !hasEdge);
+    nodeColorSection.style.display = hasNode ? '' : 'none';
+    edgeColorSection.style.display = hasEdge ? '' : 'none';
+    topBarTitle.textContent = hasNode ? 'مظهر العقدة المحددة' : hasEdge ? 'مظهر الخط المحدد' : 'حدد عقدة أو خط عشان تظبط مظهره من هنا';
+    if(hasEdge){
+      const edge = edges.find(e=>e.id===selectedEdge);
+      arrowSelect.value = edge.arrow;
+      arrowSizeSelect.value = edge.arrowSize;
+      pathStyleSelect.value = edge.pathStyle;
+      elbowDirGroup.style.display = edge.pathStyle === 'elbow' ? '' : 'none';
+      elbowDirSelect.value = edge.elbowDir || 'auto';
+      refreshEdgeColorSwatch();
+    }
+  }
+  function buildEdgeColorSwatches(){
+    edgeColorSwatches.innerHTML = '';
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'swatch swatch-reset';
+    resetBtn.title = 'لون افتراضي';
+    resetBtn.addEventListener('click', ()=>{ if(selectedEdge) setEdgeColor(null); });
+    edgeColorSwatches.appendChild(resetBtn);
+    EDGE_COLOR_PALETTE.forEach(color=>{
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch';
+      b.style.background = color;
+      b.dataset.color = color;
+      b.title = color;
+      b.addEventListener('click', ()=>{ if(selectedEdge) setEdgeColor(color); });
+      edgeColorSwatches.appendChild(b);
+    });
+    const custom = document.createElement('input');
+    custom.type = 'color';
+    custom.className = 'swatch swatch-custom';
+    custom.title = 'لون مخصص';
+    custom.addEventListener('input', ()=>{ if(selectedEdge) setEdgeColor(custom.value); });
+    custom.addEventListener('change', ()=>{ if(selectedEdge) commitHistory(); });
+    edgeColorSwatches.appendChild(custom);
+    edgeColorSwatches._customInput = custom;
+  }
+  buildEdgeColorSwatches();
+  function setEdgeColor(color){
+    const edge = edges.find(e=>e.id===selectedEdge);
+    if(!edge) return;
+    edge.color = color;
+    updateEdgePath(edge.id);
+    refreshEdgeColorSwatch();
+    commitHistory();
+  }
+  function refreshEdgeColorSwatch(){
+    const edge = edges.find(e=>e.id===selectedEdge);
+    if(!edge) return;
+    edgeColorSwatches.querySelectorAll('.swatch:not(.swatch-custom):not(.swatch-reset)').forEach(sw=>{
+      sw.classList.toggle('active', sw.dataset.color === edge.color);
+    });
+    edgeColorSwatches.querySelector('.swatch-reset').classList.toggle('active', !edge.color);
+    if(edgeColorSwatches._customInput && edge.color) edgeColorSwatches._customInput.value = edge.color;
+  }
+
+  // ---------- إنشاء عقدة ----------
+  function createNode(x, y, text, milestone, w, h, opts, forcedId){
+    opts = opts || {};
+    const id = forcedId || ('n' + (nodeSeq++));
+    w = w || DEFAULT_W; h = h || DEFAULT_H;
+    const el = document.createElement('div');
+    el.className = 'node' + (milestone ? ' milestone' : '');
+    el.dataset.id = id;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.width = w + 'px';
+    el.style.height = h + 'px';
+    el.style.zIndex = zTop++;
+
+    const textEl = document.createElement('div');
+    textEl.className = 'node-text';
+    textEl.textContent = text;
+    el.appendChild(textEl);
+
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.textContent = milestone ? 'أساسية' : 'اختيارية';
+    el.appendChild(badge);
+
+    // شارة الرابط: ضغطة مباشرة ومتزامنة تفتح الرابط (لا تتعارض مع السحب أو التحرير)
+    const linkBadge = document.createElement('div');
+    linkBadge.className = 'link-badge';
+    linkBadge.textContent = '🔗';
+    linkBadge.title = 'فتح الرابط';
+    linkBadge.addEventListener('pointerdown', (e)=> e.stopPropagation());
+    linkBadge.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const node = nodes[id];
+      if(node && isSafeLink(node.link)) window.open(node.link, '_blank', 'noopener');
+    });
+    el.appendChild(linkBadge);
+
+    ['n','s','e','w','ne','nw','se','sw'].forEach(dir=>{
+      const p = document.createElement('div');
+      p.className = 'port ' + dir;
+      p.addEventListener('pointerdown', (e)=> startEdgeDrag(e, id, dir));
+      el.appendChild(p);
+    });
+
+    ['ne','nw','se','sw'].forEach(dir=>{
+      const h2 = document.createElement('div');
+      h2.className = 'resize-handle rh-' + dir;
+      h2.addEventListener('pointerdown', (e)=> startResize(e, id, dir));
+      el.appendChild(h2);
+    });
+
+    world.appendChild(el);
+    nodes[id] = {
+      el, textEl, x, y, w, h, milestone, text,
+      bg: opts.bg || '#ffffff',
+      color: opts.color || '#1b1f27',
+      border: opts.border || (milestone ? '#e8542a' : '#d7dae1'),
+      hoverColor: opts.hoverColor || '#0f9d72',
+      hoverEffect: opts.hoverEffect || 'lift',
+      link: opts.link || ''
+    };
+    applyNodeStyle(id);
+
+    textEl.addEventListener('pointerdown', (e)=> startNodeDrag(e, id));
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); selectNode(id); });
+    textEl.addEventListener('dblclick', (e)=>{ e.stopPropagation(); enterEditMode(id); });
+
+    updateCounts();
+    return id;
+  }
+
+  function bringToFront(id){
+    nodes[id].el.style.zIndex = zTop++;
+  }
+
+  // ---------- تحرير النص بحرية ----------
+  function enterEditMode(id){
+    const node = nodes[id];
+    const ta = document.createElement('textarea');
+    ta.className = 'node-edit';
+    ta.value = node.text;
+    node.el.appendChild(ta);
+    node.textEl.style.display = 'none';
+    ta.focus();
+    ta.select();
+    function finish(){
+      const changed = ta.value.trim() && ta.value.trim() !== node.text;
+      node.text = ta.value.trim() || node.text;
+      node.textEl.textContent = node.text;
+      node.textEl.style.display = '';
+      ta.remove();
+      if(changed) commitHistory();
+    }
+    ta.addEventListener('blur', finish);
+    ta.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape'){ ta.value = node.text; finish(); }
+      e.stopPropagation();
+    });
+  }
+
+  // ---------- سحب العقد (ضغطة بدون تحريك تفتح رابط العقدة لو موجود) ----------
+  let dragState = null;
+  function startNodeDrag(e, id){
+    e.stopPropagation();
+    const node = nodes[id];
+    bringToFront(id);
+    selectNode(id);
+    dragState = { id, moved:false, startClientX: e.clientX, startClientY: e.clientY, startX: node.x, startY: node.y };
+    window.addEventListener('pointermove', onNodeDrag);
+    window.addEventListener('pointerup', endNodeDrag);
+  }
+  function onNodeDrag(e){
+    if(!dragState) return;
+    if(Math.abs(e.clientX - dragState.startClientX) > 3 || Math.abs(e.clientY - dragState.startClientY) > 3){
+      dragState.moved = true;
+    }
+    const dx = (e.clientX - dragState.startClientX) / scale;
+    const dy = (e.clientY - dragState.startClientY) / scale;
+    const node = nodes[dragState.id];
+    node.x = snap(dragState.startX + dx);
+    node.y = snap(dragState.startY + dy);
+    node.el.style.left = node.x + 'px';
+    node.el.style.top = node.y + 'px';
+    updateEdgesFor(dragState.id);
+  }
+  function endNodeDrag(){
+    if(dragState && dragState.moved) commitHistory();
+    dragState = null;
+    window.removeEventListener('pointermove', onNodeDrag);
+    window.removeEventListener('pointerup', endNodeDrag);
+  }
+
+  // ---------- تغيير الحجم من أي حافة أو زاوية ----------
+  let resizeState = null;
+  function startResize(e, id, dir){
+    e.stopPropagation(); e.preventDefault();
+    const node = nodes[id];
+    bringToFront(id); selectNode(id);
+    resizeState = { id, dir, moved:false, startClientX: e.clientX, startClientY: e.clientY, startX: node.x, startY: node.y, startW: node.w, startH: node.h };
+    window.addEventListener('pointermove', onResize);
+    window.addEventListener('pointerup', endResize);
+  }
+  function onResize(e){
+    if(!resizeState) return;
+    const dx = (e.clientX - resizeState.startClientX) / scale;
+    const dy = (e.clientY - resizeState.startClientY) / scale;
+    if(Math.abs(dx) > 1 || Math.abs(dy) > 1) resizeState.moved = true;
+    const node = nodes[resizeState.id];
+    const dir = resizeState.dir;
+    let newW = resizeState.startW, newH = resizeState.startH;
+    let newX = resizeState.startX, newY = resizeState.startY;
+
+    if(dir.indexOf('e') !== -1) newW = resizeState.startW + dx;
+    if(dir.indexOf('w') !== -1){ newW = resizeState.startW - dx; newX = resizeState.startX + dx; }
+    if(dir.indexOf('s') !== -1) newH = resizeState.startH + dy;
+    if(dir.indexOf('n') !== -1){ newH = resizeState.startH - dy; newY = resizeState.startY + dy; }
+
+    node.w = Math.max(MIN_W, snap(newW));
+    node.h = Math.max(MIN_H, snap(newH));
+    node.x = snap(newX);
+    node.y = snap(newY);
+    node.el.style.width = node.w + 'px';
+    node.el.style.height = node.h + 'px';
+    node.el.style.left = node.x + 'px';
+    node.el.style.top = node.y + 'px';
+    if(selectedNode === resizeState.id){ wInput.value = node.w; hInput.value = node.h; }
+    updateEdgesFor(resizeState.id);
+  }
+  function endResize(){
+    if(resizeState && resizeState.moved) commitHistory();
+    resizeState = null;
+    window.removeEventListener('pointermove', onResize);
+    window.removeEventListener('pointerup', endResize);
+  }
+
+  // ---------- سحب الروابط: من نقطة عقدة أو من نقطة على خط موجود (تفريع) — للعقدة أو لخط آخر ----------
+  let edgeDrag = null;
+  let tempPath = null;
+  function startEdgeDrag(e, fromId, side){
+    e.stopPropagation(); e.preventDefault();
+    beginEdgeDrag({ type:'node', nodeId: fromId, side }, e.clientX, e.clientY);
+  }
+  function startBranchDrag(e, hostEdgeId){
+    e.stopPropagation(); e.preventDefault();
+    const hostEdge = edges.find(x=>x.id===hostEdgeId);
+    const p = stagePoint(e.clientX, e.clientY);
+    const t = closestT(hostEdge, p);
+    beginEdgeDrag({ type:'edge', edgeId: hostEdgeId, t }, e.clientX, e.clientY);
+  }
+  function beginEdgeDrag(origin, startClientX, startClientY){
+    modeLabel.textContent = 'اسحب لعقدة أو خط آخر';
+    tempPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+    tempPath.setAttribute('class','edge');
+    tempPath.setAttribute('stroke-dasharray','5,5');
+    linesG.appendChild(tempPath);
+    edgeDrag = { origin, startClientX, startClientY, moved:false };
+    window.addEventListener('pointermove', onEdgeDragMove);
+    window.addEventListener('pointerup', onEdgeDragEnd);
+  }
+  function stagePoint(clientX, clientY){
+    const rect = stage.getBoundingClientRect();
+    return { x: (clientX - rect.left - panX) / scale, y: (clientY - rect.top - panY) / scale };
+  }
+  function originStartPoint(origin){
+    if(origin.type === 'edge'){
+      const e2 = edges.find(x=>x.id===origin.edgeId);
+      const { a, b } = getEdgeAB(e2);
+      return pointAtT(a, b, e2, origin.t);
+    }
+    return anchorForDir(nodes[origin.nodeId], origin.side);
+  }
+  // يحدد هل نقطة الإفلات فوق عقدة أو فوق خط موجود، وبيحسب نقطة الاتصال الفعلية (من الأماكن الثمانية) عند الإفلات على عقدة
+  function resolveDropTarget(clientX, clientY){
+    const hovered = document.elementFromPoint(clientX, clientY);
+    if(!hovered || !hovered.closest) return null;
+    const nodeEl = hovered.closest('.node');
+    if(nodeEl){
+      const targetNode = nodes[nodeEl.dataset.id];
+      const dropPoint = stagePoint(clientX, clientY);
+      const dir = autoDir(centerPoint(targetNode), dropPoint);
+      return { type:'node', nodeId: nodeEl.dataset.id, anchor: dir };
+    }
+    const hitEl = hovered.closest('.edge-hit');
+    if(hitEl && hitEl.dataset.edgeId){
+      const targetEdge = edges.find(x=>x.id===hitEl.dataset.edgeId);
+      if(targetEdge){
+        const t = closestT(targetEdge, stagePoint(clientX, clientY));
+        return { type:'edge', edgeId: targetEdge.id, t };
+      }
+    }
+    return null;
+  }
+  function onEdgeDragMove(e){
+    if(!edgeDrag) return;
+    if(Math.abs(e.clientX-edgeDrag.startClientX) > 3 || Math.abs(e.clientY-edgeDrag.startClientY) > 3) edgeDrag.moved = true;
+    const from = originStartPoint(edgeDrag.origin);
+    const p = stagePoint(e.clientX, e.clientY);
+    tempPath.setAttribute('d', previewBezier(from.x, from.y, p.x, p.y));
+    document.querySelectorAll('.node').forEach(n=>n.style.boxShadow='');
+    const hovered = document.elementFromPoint(e.clientX, e.clientY);
+    const nodeEl = hovered && hovered.closest ? hovered.closest('.node') : null;
+    if(nodeEl && !(edgeDrag.origin.type==='node' && nodeEl.dataset.id === edgeDrag.origin.nodeId)){
+      nodeEl.style.boxShadow = '0 0 0 3px var(--mint-dim)';
+    }
+  }
+  function onEdgeDragEnd(e){
+    window.removeEventListener('pointermove', onEdgeDragMove);
+    window.removeEventListener('pointerup', onEdgeDragEnd);
+    if(tempPath){ tempPath.remove(); tempPath = null; }
+    document.querySelectorAll('.node').forEach(n=>n.style.boxShadow='');
+
+    const drag = edgeDrag;
+    edgeDrag = null;
+    modeLabel.textContent = 'جاهز';
+    if(!drag) return;
+    const origin = drag.origin;
+
+    // ضغطة من غير سحب حقيقي على خط: تحديد الخط بدل إنشاء رابط جديد
+    if(!drag.moved){
+      if(origin.type === 'edge') selectEdge(origin.edgeId);
+      return;
+    }
+
+    const target = resolveDropTarget(e.clientX, e.clientY);
+    if(!target) return;
+    if(target.type==='node' && origin.type==='node' && target.nodeId===origin.nodeId) return;
+    if(target.type==='edge' && origin.type==='edge' && target.edgeId===origin.edgeId) return;
+
+    const opts = {};
+    const fromId = origin.type==='node' ? origin.nodeId : null;
+    const toId = target.type==='node' ? target.nodeId : null;
+    if(origin.type==='edge') opts.fromEdge = { edgeId: origin.edgeId, t: origin.t };
+    else opts.fromAnchor = origin.side;
+    if(target.type==='edge') opts.toEdge = { edgeId: target.edgeId, t: target.t };
+    else opts.toAnchor = target.anchor;
+
+    createEdge(fromId, toId, opts);
+    refreshAllEdges();
+    commitHistory();
+  }
+
+  function centerPoint(node){ return { x: node.x + node.w/2, y: node.y + node.h/2 }; }
+
+  // نقطة على محيط العقدة عند إحدى الأماكن الثمانية (4 زوايا + 4 أنصاف أضلاع)
+  function anchorForDir(node, dir){
+    switch(dir){
+      case 'n': return { x: node.x + node.w/2, y: node.y };
+      case 's': return { x: node.x + node.w/2, y: node.y + node.h };
+      case 'e': return { x: node.x + node.w, y: node.y + node.h/2 };
+      case 'w': return { x: node.x, y: node.y + node.h/2 };
+      case 'ne': return { x: node.x + node.w, y: node.y };
+      case 'nw': return { x: node.x, y: node.y };
+      case 'se': return { x: node.x + node.w, y: node.y + node.h };
+      case 'sw': return { x: node.x, y: node.y + node.h };
+      default: return centerPoint(node);
+    }
+  }
+  // أقرب اتجاه من الأماكن الثمانية باتجاه نقطة أخرى (يُستخدم في وضع "تلقائي")
+  function autoDir(fromCenter, toCenter){
+    const dx = toCenter.x - fromCenter.x, dy = toCenter.y - fromCenter.y;
+    if(dx === 0 && dy === 0) return 'e';
+    const deg = (Math.atan2(dy, dx) * 180/Math.PI + 360) % 360;
+    const dirs = ['e','se','s','sw','w','nw','n','ne'];
+    return dirs[Math.round(deg / 45) % 8];
+  }
+  // نقطة اتصال فعلية على حافة العقدة: تلقائية حسب اتجاه العقدة الأخرى، أو مكان محدد يدويًا
+  function resolveAnchor(node, otherCenter, dirSetting){
+    const dir = (dirSetting && dirSetting !== 'auto') ? dirSetting : autoDir(centerPoint(node), otherCenter);
+    return anchorForDir(node, dir);
+  }
+
+  // معاينة مؤقتة أثناء سحب رابط جديد من نقطة الاتصال
+  function previewBezier(x1,y1,x2,y2){
+    const dx = Math.abs(x2-x1) * 0.5 + 30;
+    const s = Math.sign(x2-x1) || 1;
+    return `M ${x1} ${y1} C ${x1+dx*s} ${y1}, ${x2-dx*s} ${y2}, ${x2} ${y2}`;
+  }
+  // منحنى الرابط الفعلي (نمط "منحني"): نقطة تحكم واحدة قابلة للسحب (bendOffset نسبةً لمنتصف الخط)
+  function edgeGeometry(a, b, bendOffset){
+    const mid = { x: (a.x+b.x)/2, y: (a.y+b.y)/2 };
+    const ctrl = { x: mid.x + (bendOffset ? bendOffset.dx : 0), y: mid.y + (bendOffset ? bendOffset.dy : 0) };
+    return { d: `M ${a.x} ${a.y} Q ${ctrl.x} ${ctrl.y} ${b.x} ${b.y}`, ctrl, points:[a,ctrl,b] };
+  }
+  // مسار الزوايا القائمة (نمط "Elbow"): جذع واحد قابل للسحب يدويًا، يتحول اتجاهه تلقائيًا حسب المسافة الأكبر
+  // نمط "Elbow": جذع واحد بزاوية قائمة، اتجاهه (أفقي/رأسي) قابل للاختيار يدويًا أو تلقائي حسب المسافة الأكبر،
+  // ومكانه يلتزم بالشبكة تلقائيًا (نفس دالة snap المستخدمة في تحريك العقد)
+  function elbowGeometry(a, b, bendOffset, elbowDir){
+    const off = bendOffset || { dx:0, dy:0 };
+    const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
+    const horizontalTrunk = elbowDir === 'h' ? true : elbowDir === 'v' ? false : dy >= dx;
+    let points, ctrl;
+    if(horizontalTrunk){
+      const trunkY = snap((a.y + b.y)/2 + off.dy);
+      points = [a, {x:a.x, y:trunkY}, {x:b.x, y:trunkY}, b];
+      ctrl = { x: (a.x+b.x)/2 + off.dx, y: trunkY };
+    } else {
+      const trunkX = snap((a.x + b.x)/2 + off.dx);
+      points = [a, {x:trunkX, y:a.y}, {x:trunkX, y:b.y}, b];
+      ctrl = { x: trunkX, y: (a.y+b.y)/2 + off.dy };
+    }
+    const d = 'M ' + points.map(p=>`${p.x} ${p.y}`).join(' L ');
+    return { d, ctrl, points };
+  }
+  // يختار دالة الهندسة حسب نمط المسار المحفوظ في الرابط
+  function computeGeometry(a, b, edge){
+    return edge.pathStyle === 'elbow' ? elbowGeometry(a, b, edge.bendOffset, edge.elbowDir) : edgeGeometry(a, b, edge.bendOffset);
+  }
+  // نقطة عند نسبة t (٠ إلى ١) على طول مسار رابط — منحني (بيزيه تربيعي) أو Elbow (متعدد الأضلاع بالطول الفعلي)
+  function pointAtT(a, b, edge, t){
+    if(edge.pathStyle === 'elbow'){
+      const { points } = elbowGeometry(a, b, edge.bendOffset, edge.elbowDir);
+      return pointOnPolyline(points, t);
+    }
+    const mid = { x:(a.x+b.x)/2, y:(a.y+b.y)/2 };
+    const ctrl = { x: mid.x + (edge.bendOffset?edge.bendOffset.dx:0), y: mid.y + (edge.bendOffset?edge.bendOffset.dy:0) };
+    const mt = 1 - t;
+    return { x: mt*mt*a.x + 2*mt*t*ctrl.x + t*t*b.x, y: mt*mt*a.y + 2*mt*t*ctrl.y + t*t*b.y };
+  }
+  function pointOnPolyline(points, t){
+    const segLens = [];
+    let total = 0;
+    for(let i=1;i<points.length;i++){
+      const len = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+      segLens.push(len); total += len;
+    }
+    if(total === 0) return points[0];
+    let target = Math.min(1,Math.max(0,t)) * total, acc = 0;
+    for(let i=0;i<segLens.length;i++){
+      if(acc + segLens[i] >= target || i === segLens.length-1){
+        const segT = segLens[i] === 0 ? 0 : Math.min(1,Math.max(0,(target-acc)/segLens[i]));
+        const p0 = points[i], p1 = points[i+1];
+        return { x: p0.x + (p1.x-p0.x)*segT, y: p0.y + (p1.y-p0.y)*segT };
+      }
+      acc += segLens[i];
+    }
+    return points[points.length-1];
+  }
+  // أقرب نسبة t على مسار رابط لنقطة معطاة (يُستخدم عند إنشاء تفرّع من خط موجود)
+  function closestT(edge, point){
+    const { a, b } = getEdgeAB(edge);
+    let best = 0.5, bestDist = Infinity;
+    for(let i=0;i<=40;i++){
+      const t = i/40;
+      const p = pointAtT(a, b, edge, t);
+      const dist = (p.x-point.x)*(p.x-point.x) + (p.y-point.y)*(p.y-point.y);
+      if(dist < bestDist){ bestDist = dist; best = t; }
+    }
+    return best;
+  }
+
+  // نقطتا نهاية الرابط الفعليتان — قد تكونا على حافة عقدة، أو على مسار رابط آخر (تفرّع)
+  function getEdgeAB(edge, depth){
+    depth = depth || 0;
+    if(depth > 24) return { a:{x:0,y:0}, b:{x:0,y:0} };
+    return { a: resolveEdgeEndpoint(edge, 'from', depth+1), b: resolveEdgeEndpoint(edge, 'to', depth+1) };
+  }
+  function resolveEdgeEndpoint(edge, side, depth){
+    const refKey = side === 'from' ? 'fromEdge' : 'toEdge';
+    const ref = edge[refKey];
+    if(ref){
+      const target = edges.find(e2=>e2.id===ref.edgeId);
+      if(!target) return { x:0, y:0 };
+      const { a, b } = getEdgeAB(target, depth);
+      return pointAtT(a, b, target, ref.t);
+    }
+    const node = nodes[edge[side]];
+    if(!node) return { x:0, y:0 };
+    const otherSide = side === 'from' ? 'to' : 'from';
+    const hint = roughPoint(edge, otherSide, depth);
+    const dirSetting = side === 'from' ? edge.fromAnchor : edge.toAnchor;
+    return resolveAnchor(node, hint, dirSetting);
+  }
+  // نقطة تقريبية سريعة (لتحديد اتجاه "تلقائي" فقط) بدون حساب المسار الكامل
+  function roughPoint(edge, side, depth){
+    depth = depth || 0;
+    if(depth > 24) return { x:0, y:0 };
+    const refKey = side === 'from' ? 'fromEdge' : 'toEdge';
+    const ref = edge[refKey];
+    if(ref){
+      const target = edges.find(e2=>e2.id===ref.edgeId);
+      if(!target) return { x:0, y:0 };
+      const pa = roughPoint(target, 'from', depth+1), pb = roughPoint(target, 'to', depth+1);
+      return { x:(pa.x+pb.x)/2, y:(pa.y+pb.y)/2 };
+    }
+    const node = nodes[edge[side]];
+    return node ? centerPoint(node) : { x:0, y:0 };
+  }
+
+  // لا يوجد حد أقصى لعدد الروابط الخارجة من نفس العقدة — فقط يمنع تكرار نفس الزوج (إلا أثناء إعادة البناء من السجل)
+  function createEdge(fromId, toId, opts){
+    opts = opts || {};
+    const usesFromEdge = !!opts.fromEdge, usesToEdge = !!opts.toEdge;
+    if(!opts.id && !usesFromEdge && !usesToEdge){
+      const exists = edges.find(ed => (ed.from===fromId && ed.to===toId) || (ed.from===toId && ed.to===fromId));
+      if(exists) return;
+    }
+    const id = opts.id || ('e' + (edgeSeq++));
+    const milestone = !usesFromEdge && !usesToEdge && nodes[fromId] && nodes[toId] && nodes[fromId].milestone && nodes[toId].milestone;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const group = document.createElementNS(svgNS,'g');
+    group.setAttribute('class','edge-group');
+    const path = document.createElementNS(svgNS,'path');
+    path.setAttribute('class','edge' + (milestone ? ' milestone' : ''));
+    const hit = document.createElementNS(svgNS,'path');
+    hit.setAttribute('class','edge-hit');
+    hit.dataset.edgeId = id;
+    const handle = document.createElementNS(svgNS,'circle');
+    handle.setAttribute('class','edge-handle');
+    handle.setAttribute('r','7');
+    group.appendChild(path); group.appendChild(hit); group.appendChild(handle);
+    linesG.appendChild(group);
+
+    const edge = {
+      id,
+      from: usesFromEdge ? null : fromId,
+      to: usesToEdge ? null : toId,
+      fromEdge: opts.fromEdge ? { ...opts.fromEdge } : null,
+      toEdge: opts.toEdge ? { ...opts.toEdge } : null,
+      pathEl: path, hitEl: hit, handleEl: handle, groupEl: group,
+      bendOffset: opts.bendOffset ? { ...opts.bendOffset } : { dx:0, dy:0 },
+      milestone,
+      arrow: opts.arrow || 'end',
+      arrowSize: opts.arrowSize || 'md',
+      pathStyle: opts.pathStyle || 'curve',
+      elbowDir: opts.elbowDir || 'auto',
+      color: opts.color || null,
+      fromAnchor: opts.fromAnchor || 'auto',
+      toAnchor: opts.toAnchor || 'auto'
+    };
+    edges.push(edge);
+
+    hit.addEventListener('pointerdown', (e)=> startBranchDrag(e, id));
+    handle.addEventListener('pointerdown', (e)=> startEdgeGrab(e, id));
+    hit.addEventListener('dblclick', (e)=>{
+      e.stopPropagation();
+      edge.bendOffset = { dx:0, dy:0 };
+      refreshAllEdges();
+      commitHistory();
+    });
+
+    updateEdgeMarkers(id);
+    updateEdgePath(id);
+    updateCounts();
+  }
+
+  // تحديث رأس السهم (بدون / وجهة / مصدر / الاتجاهين) بلون مطابق لنوع الخط
+  function updateEdgeMarkers(id){
+    const edge = edges.find(e=>e.id===id);
+    if(!edge) return;
+    const markerId = 'arrow-' + (edge.arrowSize || 'md');
+    edge.pathEl.removeAttribute('marker-start');
+    edge.pathEl.removeAttribute('marker-end');
+    if(edge.arrow === 'end' || edge.arrow === 'both'){
+      edge.pathEl.setAttribute('marker-end', `url(#${markerId})`);
+    }
+    if(edge.arrow === 'start' || edge.arrow === 'both'){
+      edge.pathEl.setAttribute('marker-start', `url(#${markerId})`);
+    }
+  }
+
+  // سحب الخط نفسه (من أي نقطة عليه) أو من مقبضه الدائري لثنيه وفكّ أي تصادم بينه وبين خطوط تانية
+  let edgeBendState = null;
+  function startEdgeGrab(e, id){
+    e.stopPropagation(); e.preventDefault();
+    const edge = edges.find(x=>x.id===id);
+    edgeBendState = {
+      id, moved:false,
+      startClientX: e.clientX, startClientY: e.clientY,
+      startOffset: { ...edge.bendOffset }
+    };
+    window.addEventListener('pointermove', onEdgeBendMove);
+    window.addEventListener('pointerup', onEdgeBendUp);
+  }
+  function onEdgeBendMove(e){
+    if(!edgeBendState) return;
+    const dx = (e.clientX - edgeBendState.startClientX) / scale;
+    const dy = (e.clientY - edgeBendState.startClientY) / scale;
+    if(Math.abs(dx) > 3 || Math.abs(dy) > 3) edgeBendState.moved = true;
+    const edge = edges.find(x=>x.id===edgeBendState.id);
+    edge.bendOffset = { dx: edgeBendState.startOffset.dx + dx, dy: edgeBendState.startOffset.dy + dy };
+    refreshAllEdges();
+  }
+  function onEdgeBendUp(){
+    window.removeEventListener('pointermove', onEdgeBendMove);
+    window.removeEventListener('pointerup', onEdgeBendUp);
+    if(edgeBendState && !edgeBendState.moved) selectEdge(edgeBendState.id);
+    if(edgeBendState && edgeBendState.moved) commitHistory();
+    edgeBendState = null;
+  }
+
+  function updateEdgePath(id){
+    const edge = edges.find(e=>e.id===id);
+    if(!edge) return;
+    const { a, b } = getEdgeAB(edge);
+    const geo = computeGeometry(a, b, edge);
+    edge.pathEl.setAttribute('d', geo.d);
+    edge.hitEl.setAttribute('d', geo.d);
+    edge.handleEl.setAttribute('cx', geo.ctrl.x);
+    edge.handleEl.setAttribute('cy', geo.ctrl.y);
+    edge.pathEl.style.stroke = edge.color || '';
+  }
+  // كل الخطوط ممكن تعتمد هندسيًا على بعضها (تفرّع من خط) فبنعيد حساب الكل بأمان بدل خط واحد بس
+  function refreshAllEdges(){
+    edges.forEach(e=> updateEdgePath(e.id));
+  }
+  function updateEdgesFor(){
+    refreshAllEdges();
+  }
+
+  // ---------- التحديد والحذف ----------
+  function selectNode(id){
+    clearSelection();
+    selectedNode = id;
+    nodes[id].el.classList.add('selected');
+    propsPanel.style.display = '';
+    wInput.value = nodes[id].w;
+    hInput.value = nodes[id].h;
+    linkInput.value = nodes[id].link || '';
+    refreshSwatchSelection();
+    refreshTopBar();
+  }
+  function selectEdge(id){
+    clearSelection();
+    selectedEdge = id;
+    const edge = edges.find(e=>e.id===id);
+    edge.groupEl.classList.add('selected');
+    refreshTopBar();
+  }
+  function clearSelection(){
+    if(selectedNode) nodes[selectedNode].el.classList.remove('selected');
+    if(selectedEdge){
+      const edge = edges.find(e=>e.id===selectedEdge);
+      if(edge) edge.groupEl.classList.remove('selected');
+    }
+    selectedNode = null; selectedEdge = null;
+    propsPanel.style.display = 'none';
+    refreshTopBar();
+  }
+  // كل الخطوط اللي متفرّعة من رابط معيّن (بشكل متسلسل) — عشان محذفش خط ويسيب فروعه معلّقة
+  function collectDependentEdgeIds(edgeId, seen){
+    seen = seen || new Set();
+    edges.forEach(e=>{
+      const dependsOnIt = (e.fromEdge && e.fromEdge.edgeId===edgeId) || (e.toEdge && e.toEdge.edgeId===edgeId);
+      if(dependsOnIt && !seen.has(e.id)){
+        seen.add(e.id);
+        collectDependentEdgeIds(e.id, seen);
+      }
+    });
+    return seen;
+  }
+  function removeEdgesByIds(idSet){
+    edges = edges.filter(e=>{
+      if(idSet.has(e.id)){ e.groupEl.remove(); return false; }
+      return true;
+    });
+  }
+  function deleteSelected(){
+    if(selectedNode){
+      const id = selectedNode;
+      const directIds = edges.filter(e=> e.from===id || e.to===id).map(e=>e.id);
+      const allIds = new Set(directIds);
+      directIds.forEach(eid=> collectDependentEdgeIds(eid, allIds));
+      removeEdgesByIds(allIds);
+      nodes[id].el.remove();
+      delete nodes[id];
+      selectedNode = null;
+      propsPanel.style.display = 'none';
+    } else if(selectedEdge){
+      const allIds = collectDependentEdgeIds(selectedEdge, new Set([selectedEdge]));
+      removeEdgesByIds(allIds);
+      selectedEdge = null;
+    } else {
+      return;
+    }
+    refreshAllEdges();
+    updateCounts();
+    refreshTopBar();
+    commitHistory();
+  }
+
+  function updateCounts(){
+    cNodesEl.textContent = Object.keys(nodes).length;
+    cEdgesEl.textContent = edges.length;
+  }
+
+  wInput.addEventListener('input', ()=>{
+    if(!selectedNode) return;
+    const node = nodes[selectedNode];
+    node.w = Math.max(MIN_W, parseInt(wInput.value)||DEFAULT_W);
+    node.el.style.width = node.w + 'px';
+    updateEdgesFor(selectedNode);
+  });
+  wInput.addEventListener('change', ()=> selectedNode && commitHistory());
+  hInput.addEventListener('input', ()=>{
+    if(!selectedNode) return;
+    const node = nodes[selectedNode];
+    node.h = Math.max(MIN_H, parseInt(hInput.value)||DEFAULT_H);
+    node.el.style.height = node.h + 'px';
+    updateEdgesFor(selectedNode);
+  });
+  hInput.addEventListener('change', ()=> selectedNode && commitHistory());
+  linkInput.addEventListener('input', ()=>{
+    if(!selectedNode) return;
+    nodes[selectedNode].link = linkInput.value.trim();
+    applyNodeStyle(selectedNode);
+  });
+  linkInput.addEventListener('change', ()=> selectedNode && commitHistory());
+  hoverEffectSelect.addEventListener('change', ()=>{
+    if(!selectedNode) return;
+    nodes[selectedNode].hoverEffect = hoverEffectSelect.value;
+    applyNodeStyle(selectedNode);
+    commitHistory();
+  });
+  arrowSelect.addEventListener('change', ()=>{
+    if(!selectedEdge) return;
+    const edge = edges.find(e=>e.id===selectedEdge);
+    edge.arrow = arrowSelect.value;
+    updateEdgeMarkers(selectedEdge);
+    commitHistory();
+  });
+  arrowSizeSelect.addEventListener('change', ()=>{
+    if(!selectedEdge) return;
+    const edge = edges.find(e=>e.id===selectedEdge);
+    edge.arrowSize = arrowSizeSelect.value;
+    updateEdgeMarkers(selectedEdge);
+    commitHistory();
+  });
+  pathStyleSelect.addEventListener('change', ()=>{
+    if(!selectedEdge) return;
+    const edge = edges.find(e=>e.id===selectedEdge);
+    edge.pathStyle = pathStyleSelect.value;
+    elbowDirGroup.style.display = edge.pathStyle === 'elbow' ? '' : 'none';
+    refreshAllEdges();
+    commitHistory();
+  });
+  elbowDirSelect.addEventListener('change', ()=>{
+    if(!selectedEdge) return;
+    const edge = edges.find(e=>e.id===selectedEdge);
+    edge.elbowDir = elbowDirSelect.value;
+    refreshAllEdges();
+    commitHistory();
+  });
+
+  // ---------- تحريك اللوحة (Pan) والتكبير (Zoom) ----------
+  let panState = null;
+  stage.addEventListener('pointerdown', (e)=>{
+    if(e.target !== stage && e.target.id !== 'canvas-wrap' && e.target.id !== 'grid') return;
+    clearSelection();
+    panState = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
+    stage.classList.add('panning');
+    window.addEventListener('pointermove', onPan);
+    window.addEventListener('pointerup', endPan);
+  });
+  function onPan(e){
+    if(!panState) return;
+    panX = panState.startPanX + (e.clientX - panState.startX);
+    panY = panState.startPanY + (e.clientY - panState.startY);
+    applyTransform();
+  }
+  function endPan(){
+    panState = null;
+    stage.classList.remove('panning');
+    window.removeEventListener('pointermove', onPan);
+    window.removeEventListener('pointerup', endPan);
+  }
+
+  function setZoom(newScale, clientX, clientY){
+    newScale = Math.min(2, Math.max(0.4, newScale));
+    const rect = stage.getBoundingClientRect();
+    const cx = clientX !== undefined ? clientX - rect.left : rect.width/2;
+    const cy = clientY !== undefined ? clientY - rect.top : rect.height/2;
+    const worldX = (cx - panX) / scale;
+    const worldY = (cy - panY) / scale;
+    scale = newScale;
+    panX = cx - worldX * scale;
+    panY = cy - worldY * scale;
+    applyTransform();
+    zoomResetBtn.textContent = Math.round(scale*100) + '%';
+  }
+  stage.addEventListener('wheel', (e)=>{ e.preventDefault(); setZoom(scale * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY); }, { passive:false });
+  zoomInBtn.addEventListener('click', ()=> setZoom(scale*1.15));
+  zoomOutBtn.addEventListener('click', ()=> setZoom(scale*0.87));
+  zoomResetBtn.addEventListener('click', ()=> setZoom(1));
+
+  // ---------- شريط الأدوات ----------
+  milestoneSwitch.addEventListener('click', ()=>{
+    isMilestoneMode = !isMilestoneMode;
+    milestoneSwitch.classList.toggle('on', isMilestoneMode);
+  });
+  snapSwitch.addEventListener('click', ()=>{
+    snapEnabled = !snapEnabled;
+    snapSwitch.classList.toggle('on', snapEnabled);
+  });
+
+  function addFromInput(){
+    const text = nodeInput.value.trim();
+    if(!text) return;
+    const rect = stage.getBoundingClientRect();
+    const p = stagePoint(rect.width/2 + (Math.random()*120-60), rect.height/2 + (Math.random()*120-60));
+    createNode(snap(p.x), snap(p.y), text, isMilestoneMode);
+    nodeInput.value = '';
+    nodeInput.focus();
+    commitHistory();
+  }
+  addBtn.addEventListener('click', addFromInput);
+  nodeInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') addFromInput(); });
+
+  deleteBtn.addEventListener('click', deleteSelected);
+  clearSelBtn.addEventListener('click', clearSelection);
+  window.addEventListener('keydown', (e)=>{
+    const activeTag = document.activeElement && document.activeElement.tagName;
+    const typing = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
+    const mod = e.ctrlKey || e.metaKey;
+
+    if(mod && !typing && (e.key === 'z' || e.key === 'Z')){
+      e.preventDefault();
+      if(e.shiftKey) redo(); else undo();
+      return;
+    }
+    if(mod && !typing && (e.key === 'y' || e.key === 'Y')){
+      e.preventDefault();
+      redo();
+      return;
+    }
+    if((e.key==='Delete' || e.key==='Backspace') && !typing){
+      deleteSelected();
+    }
+  });
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+
+  // ================= التراجع/الإعادة: نسخ كاملة (snapshot) لحظة كل إجراء ذو معنى =================
+  const HISTORY_LIMIT = 60;
+  let history = [];
+  let future = [];
+
+  function snapshotState(){
+    return {
+      nodeSeq, edgeSeq, zTop,
+      nodes: Object.keys(nodes).map(id=>{
+        const n = nodes[id];
+        return { id, x:n.x, y:n.y, w:n.w, h:n.h, text:n.text, milestone:n.milestone,
+          bg:n.bg, color:n.color, border:n.border, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect, link:n.link };
+      }),
+      edges: edges.map(e=> ({
+        id:e.id, from:e.from, to:e.to,
+        fromEdge: e.fromEdge ? { ...e.fromEdge } : null,
+        toEdge: e.toEdge ? { ...e.toEdge } : null,
+        bendOffset:{ ...e.bendOffset }, arrow:e.arrow, arrowSize:e.arrowSize, pathStyle:e.pathStyle, elbowDir:e.elbowDir, color:e.color,
+        fromAnchor:e.fromAnchor, toAnchor:e.toAnchor
+      }))
+    };
+  }
+
+  function restoreState(snap){
+    Object.keys(nodes).forEach(id=>{ nodes[id].el.remove(); delete nodes[id]; });
+    edges.forEach(e=> e.groupEl.remove());
+    edges = [];
+    clearSelection();
+
+    snap.nodes.forEach(n=>{
+      createNode(n.x, n.y, n.text, n.milestone, n.w, n.h, {
+        bg:n.bg, color:n.color, border:n.border, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect, link:n.link
+      }, n.id);
+    });
+    snap.edges.forEach(e=>{
+      createEdge(e.from, e.to, {
+        id:e.id, bendOffset:e.bendOffset, arrow:e.arrow, arrowSize:e.arrowSize, pathStyle:e.pathStyle, elbowDir:e.elbowDir, color:e.color,
+        fromAnchor:e.fromAnchor, toAnchor:e.toAnchor, fromEdge:e.fromEdge, toEdge:e.toEdge
+      });
+    });
+
+    nodeSeq = snap.nodeSeq;
+    edgeSeq = snap.edgeSeq;
+    zTop = snap.zTop;
+    refreshAllEdges();
+    updateCounts();
+    refreshTopBar();
+  }
+
+  function commitHistory(){
+    history.push(snapshotState());
+    if(history.length > HISTORY_LIMIT) history.shift();
+    future = [];
+    updateHistoryButtons();
+    window.dispatchEvent(new CustomEvent('roadmap:changed', { detail: snapshotState() }));
+  }
+  function undo(){
+    if(history.length < 2) return;
+    future.push(history.pop());
+    restoreState(JSON.parse(JSON.stringify(history[history.length-1])));
+    updateHistoryButtons();
+  }
+  function redo(){
+    if(future.length === 0) return;
+    const next = future.pop();
+    history.push(next);
+    restoreState(JSON.parse(JSON.stringify(next)));
+    updateHistoryButtons();
+  }
+  function updateHistoryButtons(){
+    undoBtn.disabled = history.length < 2;
+    redoBtn.disabled = future.length === 0;
+  }
+
+  // ================= التصدير: 3 ملفات مستقلة =================
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+  function downloadFile(filename, content, mime){
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 4000);
+  }
+
+  function buildExport(){
+    const ids = Object.keys(nodes);
+    if(ids.length === 0) return null;
+    const PAD = 60;
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    ids.forEach(id=>{
+      const n = nodes[id];
+      minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h);
+    });
+    const offX = PAD - minX, offY = PAD - minY;
+    const W = Math.ceil(maxX - minX + PAD*2);
+    const H = Math.ceil(maxY - minY + PAD*2);
+
+    const nodeDivs = ids.map(id=>{
+      const n = nodes[id];
+      const safeLink = isSafeLink(n.link);
+      const tag = safeLink ? 'a' : 'div';
+      const linkAttrs = safeLink ? ` href="${escapeHtml(n.link)}" target="_blank" rel="noopener"` : '';
+      const style = `left:${Math.round(n.x+offX)}px; top:${Math.round(n.y+offY)}px; width:${Math.round(n.w)}px; height:${Math.round(n.h)}px; background:${n.bg}; border-color:${n.border}; --hover-c:${n.hoverColor}; --hover-c-dim:${hexToRgba(n.hoverColor,.35)};`;
+      return `    <${tag} class="rm-node${n.milestone ? ' rm-milestone':''} rm-hover-${n.hoverEffect||'lift'}" data-id="${id}"${linkAttrs} style="${style}">
+      <div class="rm-node-text" style="color:${n.color};">${escapeHtml(n.text)}</div>
+      <span class="rm-badge">${n.milestone ? 'أساسية' : 'اختيارية'}</span>
+    </${tag}>`;
+    }).join('\n');
+
+    const edgePaths = edges.map(e=>{
+      const { a: rawA, b: rawB } = getEdgeAB(e);
+      const a = { x: rawA.x + offX, y: rawA.y + offY };
+      const b = { x: rawB.x + offX, y: rawB.y + offY };
+      const geo = computeGeometry(a, b, e);
+      const markerId = 'rm-arrow-' + (e.arrowSize || 'md');
+      const arrow = e.arrow || 'end';
+      const markerAttrs =
+        (arrow === 'end' || arrow === 'both' ? ` marker-end="url(#${markerId})"` : '') +
+        (arrow === 'start' || arrow === 'both' ? ` marker-start="url(#${markerId})"` : '');
+      const strokeStyle = e.color ? ` style="stroke:${e.color}"` : '';
+      return `    <path class="rm-edge${e.milestone?' rm-milestone':''}" data-from="${e.from||''}" data-to="${e.to||''}" d="${geo.d}"${markerAttrs}${strokeStyle}></path>`;
+    }).join('\n');
+
+    const edgeDefs = `      <defs>
+        <marker id="rm-arrow-sm" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+        <marker id="rm-arrow-md" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+        <marker id="rm-arrow-lg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="13" markerHeight="13" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+      </defs>`;
+
+    const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>خريطة الطريق</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="rm-wrap">
+  <div class="rm-canvas" style="width:${W}px; height:${H}px;">
+    <svg class="rm-edges" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+${edgeDefs}
+${edgePaths}
+    </svg>
+${nodeDivs}
+  </div>
+</div>
+<script src="script.js"><\/script>
+</body>
+</html>
+`;
+
+    const css = `@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root{
+  --bg: #f4f5f7;
+  --accent: #e8542a;
+  --mint: #0f9d72;
+  --mint-dim: #0f9d7233;
+  --text: #1b1f27;
+  --text-dim: #6b7280;
+  --node-bg: #ffffff;
+  --node-border: #d7dae1;
+  --line: #9aa1b0;
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; background:var(--bg); font-family:'IBM Plex Sans Arabic', sans-serif; color:var(--text); }
+.rm-wrap{ width:100%; overflow:auto; padding:40px; }
+.rm-canvas{ position:relative; margin:0 auto; }
+.rm-edges{ position:absolute; top:0; left:0; pointer-events:none; }
+.rm-edge{ fill:none; stroke:var(--line); stroke-width:2.5; transition:stroke .15s, stroke-width .15s; }
+.rm-edge.rm-milestone{ stroke:var(--accent); }
+.rm-edge.rm-active{ stroke:var(--mint); stroke-width:3.5; }
+.rm-node{
+  position:absolute; background:var(--node-bg); border:1.5px solid var(--node-border);
+  border-radius:10px; box-shadow:0 1px 3px rgba(27,31,39,.07);
+  transition:border-color .15s, box-shadow .15s, transform .1s;
+  text-decoration:none; color:inherit; display:block;
+}
+.rm-node.rm-milestone{ border-width:2px; }
+.rm-node.rm-active{ border-color:var(--mint); box-shadow:0 0 0 3px var(--mint-dim); transform:translateY(-2px); }
+.rm-node.rm-hover-lift:hover{ transform:translateY(-3px); border-color:var(--hover-c); box-shadow:0 8px 20px var(--hover-c-dim), 0 2px 6px rgba(27,31,39,.08); }
+.rm-node.rm-hover-glow:hover{ border-color:var(--hover-c); box-shadow:0 0 0 5px var(--hover-c-dim), 0 4px 14px rgba(27,31,39,.1); }
+.rm-node.rm-hover-pulse:hover{ border-color:var(--hover-c); animation: rmPulse 1.3s ease-in-out infinite; }
+@keyframes rmPulse{
+  0%,100%{ box-shadow:0 0 0 0 var(--hover-c-dim); }
+  50%{ box-shadow:0 0 0 8px transparent; }
+}
+.rm-node[href]{ cursor:pointer; }
+.rm-node-text{
+  position:absolute; inset:0; padding:10px 14px; font-size:14px; font-weight:600;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  line-height:1.5; overflow:auto; white-space:pre-wrap; word-break:break-word;
+}
+.rm-badge{
+  position:absolute; bottom:6px; left:14px; font-family:'JetBrains Mono', monospace;
+  font-size:9.5px; color:var(--text-dim);
+}
+`;
+
+    const js = `// تفاعل بسيط: إبراز العقدة والروابط المتصلة بها عند مرور الفأرة
+document.addEventListener('DOMContentLoaded', function(){
+  var nodes = document.querySelectorAll('.rm-node');
+  var edges = document.querySelectorAll('.rm-edge');
+  nodes.forEach(function(node){
+    node.addEventListener('mouseenter', function(){
+      var id = node.dataset.id;
+      node.classList.add('rm-active');
+      edges.forEach(function(edge){
+        if(edge.dataset.from === id || edge.dataset.to === id){
+          edge.classList.add('rm-active');
+        }
+      });
+    });
+    node.addEventListener('mouseleave', function(){
+      node.classList.remove('rm-active');
+      edges.forEach(function(edge){ edge.classList.remove('rm-active'); });
+    });
+  });
+});
+`;
+    return { html, css, js };
+  }
+
+  exportBtn.addEventListener('click', ()=>{
+    const out = buildExport();
+    if(!out){ alert('أضف عقدة واحدة على الأقل قبل التصدير.'); return; }
+    downloadFile('index.html', out.html, 'text/html');
+    setTimeout(()=> downloadFile('style.css', out.css, 'text/css'), 250);
+    setTimeout(()=> downloadFile('script.js', out.js, 'text/javascript'), 500);
+  });
+
+  function clearDocument(){
+    Object.keys(nodes).forEach(id=>{ nodes[id].el.remove(); delete nodes[id]; });
+    edges.forEach(e=> e.groupEl.remove());
+    edges = [];
+    selectedNode = null;
+    selectedEdge = null;
+    nodeSeq = 1;
+    edgeSeq = 1;
+    zTop = 1;
+    history = [];
+    future = [];
+    propsPanel.style.display = 'none';
+    refreshAllEdges();
+    updateCounts();
+    refreshTopBar();
+    updateHistoryButtons();
+  }
+
+  function loadDocumentState(snap, options){
+    if(!snap || !Array.isArray(snap.nodes) || !Array.isArray(snap.edges)) return false;
+    restoreState(JSON.parse(JSON.stringify(snap)));
+    if(!options || options.resetHistory !== false){
+      history = [snapshotState()];
+      future = [];
+      updateHistoryButtons();
+    }
+    window.dispatchEvent(new CustomEvent('roadmap:loaded', { detail: snapshotState() }));
+    return true;
+  }
+
+  function createBlankDocument(){
+    clearDocument();
+    commitHistory();
+  }
+
+  window.RoadmapBuilder = {
+    getState: function(){ return snapshotState(); },
+    loadState: loadDocumentState,
+    newDocument: createBlankDocument,
+    exportFiles: buildExport,
+    downloadCurrentExport: function(){
+      const out = buildExport();
+      if(!out){ alert('أضف عقدة واحدة على الأقل قبل التصدير.'); return; }
+      downloadFile('index.html', out.html, 'text/html');
+      setTimeout(()=> downloadFile('style.css', out.css, 'text/css'), 250);
+      setTimeout(()=> downloadFile('script.js', out.js, 'text/javascript'), 500);
+    }
+  };
+
+  // ---------- بيانات افتتاحية توضيحية ----------
+  function seed(){
+    const a = createNode(96, 288, 'أساسيات ++C', true, 170, 60);
+    const b = createNode(408, 120, 'المؤشرات والذاكرة', true, 180, 60);
+    const c = createNode(408, 456, 'البرمجة الكائنية OOP', true, 190, 60);
+    const d = createNode(744, 48, 'STL', false, 150, 56, { link: 'https://cppreference.com', hoverColor: '#2f6fed', hoverEffect: 'glow' });
+    const e2 = createNode(744, 264, 'إدارة الذاكرة المتقدمة', false, 200, 72);
+    const f = createNode(744, 480, 'أنماط التصميم', false, 170, 56);
+    createEdge(a,b); createEdge(a,c);
+    createEdge(b,d); createEdge(b,e2);
+    createEdge(c,f); createEdge(c,e2);
+  }
+  seed();
+  commitHistory();
+  updateHistoryButtons();
+  setZoom(1);
+})();
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
