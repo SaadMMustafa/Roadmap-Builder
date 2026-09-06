@@ -94,6 +94,15 @@ class FirebaseBackend {
     this.app = initializeApp(this.config);
     this.auth = authModule.getAuth(this.app);
     this.db = firestoreModule.getFirestore(this.app);
+
+    // لازم نلتقط نتيجة أي تسجيل دخول عن طريق التحويل (Redirect) قبل ما نستنى أول حالة مصادقة،
+    // لأن لو حصل fallback من popup لredirect، المستخدم بيرجع للصفحة من جديد وده أول حاجة لازم تتفحص.
+    try {
+      await authModule.getRedirectResult(this.auth);
+    } catch(err) {
+      console.error('redirect result error', err);
+    }
+
     await new Promise(resolve => {
       const unsubscribe = authModule.onAuthStateChanged(this.auth, user => {
         this.user = user;
@@ -110,12 +119,28 @@ class FirebaseBackend {
     return true;
   }
 
+  // popup أولًا (أسرع وأوضح للمستخدم)، ولو المتصفح حجبها أو رفضها نرجع تلقائيًا لـ redirect
+  // بدل ما تسجيل الدخول يفشل بصمت أو برسالة عامة مش مفيدة.
   async signInWithGoogle() {
     const provider = new this.authApi.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    const credential = await this.authApi.signInWithPopup(this.auth, provider);
-    await this.ensureUserProfile(credential.user);
-    return credential;
+    try {
+      const credential = await this.authApi.signInWithPopup(this.auth, provider);
+      await this.ensureUserProfile(credential.user);
+      return credential;
+    } catch(err) {
+      const fallbackCodes = [
+        'auth/popup-blocked',
+        'auth/popup-closed-by-user',
+        'auth/cancelled-popup-request',
+        'auth/operation-not-supported-in-this-environment'
+      ];
+      if(err && fallbackCodes.includes(err.code) && err.code !== 'auth/popup-closed-by-user'){
+        await this.authApi.signInWithRedirect(this.auth, provider);
+        return null; // الصفحة هتعمل reload بعد التحويل، والنتيجة هتتلقط في init() عبر getRedirectResult
+      }
+      throw err;
+    }
   }
 
   async signOut() {
@@ -260,6 +285,12 @@ class RoadmapApp {
       this.lockApp('أضف إعدادات Firebase في firebase-config.js لتفعيل تسجيل الدخول.');
       return;
     }
+    if(window.location.protocol === 'file:') {
+      // تسجيل الدخول بـ Firebase مستحيل يشتغل وأنت فاتح الملف مباشرة (file://) — لازم يتقدّم من خلال سيرفر http/https.
+      this.setStatus('لازم تشغيل الصفحة من سيرفر');
+      this.lockApp('افتح المشروع عن طريق سيرفر محلي (مثلاً: python -m http.server) أو من دومين حقيقي — تسجيل الدخول لا يعمل مع فتح الملف مباشرة (file://).');
+      return;
+    }
     try {
       this.setStatus('جاري اتصال Firebase...');
       this.lockApp('جاري تجهيز تسجيل الدخول...');
@@ -268,8 +299,9 @@ class RoadmapApp {
       });
     } catch(err) {
       console.error(err);
+      const detail = err && (err.code || err.message) ? ` (${err.code || err.message})` : '';
       this.setStatus('تعذر تفعيل Firebase');
-      this.lockApp('تعذر الاتصال بـ Firebase. راجع إعدادات المشروع والدومين المصرّح.');
+      this.lockApp(`تعذر الاتصال بـ Firebase${detail}. راجع إعدادات المشروع، والدومين المصرّح في Authentication -> Settings -> Authorized domains.`);
     }
   }
 
@@ -460,12 +492,16 @@ class RoadmapApp {
   async signInWithGoogle() {
     try {
       this.lockApp('جاري فتح Google...');
-      await this.backend.signInWithGoogle();
+      const credential = await this.backend.signInWithGoogle();
+      if(!credential) return; // تم التحويل لصفحة جوجل (fallback)، النتيجة هتتلقط بعد رجوع الصفحة
       await this.saveNow(false);
     } catch(err) {
       console.error(err);
       const cancelled = err && (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request');
-      this.lockApp(cancelled ? 'تم إلغاء تسجيل الدخول.' : 'تعذر تسجيل الدخول بجوجل. راجع تفعيل Google provider والدومين في Firebase.');
+      const detail = err && (err.code || err.message) ? ` (${err.code || err.message})` : '';
+      this.lockApp(cancelled
+        ? 'تم إلغاء تسجيل الدخول.'
+        : `تعذر تسجيل الدخول بجوجل${detail}. راجع تفعيل Google provider والدومين المصرّح في Firebase.`);
     }
   }
 
