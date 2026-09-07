@@ -354,14 +354,23 @@
     text-align:center;
   }
 
-  /* أيقونة الحساب العلوية */
+  /* ===== مقياس الطبقات (z-index) الموحّد للتطبيق كله — أي عنصر جديد يتبع الترتيب ده ===== */
+  /* 20-25: شريط الأدوات والشريط العلوي وحالة التطبيق (فوق الكانفاس)                    */
+  /* 30   : أيقونة الحساب العلوية                                                        */
+  /* 70   : شريط تنبيه وضع المشاركة                                                      */
+  /* 88-89: خلفية/جسم درج الحساب الجانبي                                                 */
+  /* 150  : خلفية النوافذ المنبثقة (الداشبورد، التأكيد، الرابط، تصدير PNG)                */
+  /* 300  : شاشة تسجيل الدخول الإجبارية (تحجب كل حاجة تحتها)                              */
+  /* 310  : التوستات — لازم تفضل ظاهرة فوق أي حاجة تانية حتى شاشة القفل                    */
+
+  /* أيقونة الحساب العلوية — تحت الشريط العلوي مباشرة عشان متتداخلش بصريًا معاه */
   .account-icon-btn{
-    position:fixed; top:20px; left:20px; z-index:30;
-    width:42px; height:42px; border-radius:50%;
+    position:fixed; top:76px; left:20px; z-index:30;
+    width:44px; height:44px; border-radius:50%;
     background:var(--panel); border:1px solid var(--panel-border);
     box-shadow:0 6px 18px #1b1f2718;
     display:flex; align-items:center; justify-content:center;
-    cursor:pointer; padding:0; position:relative;
+    cursor:pointer; padding:0;
   }
   .account-icon-btn:hover{ border-color:var(--mint); }
   .account-icon-glyph{ font-size:18px; line-height:1; filter:grayscale(1) opacity(.75); }
@@ -400,9 +409,33 @@
   body.account-signed-in .auth-signin-section{ display:none; }
   body.account-signed-in .auth-account-section{ display:flex; }
 
+  /* شاشة تسجيل الدخول الإجبارية — أعلى طبقة تقريبًا، بتحجب كل حاجة لحد ما يسجّل دخول */
+  .login-gate{
+    position:fixed; inset:0; z-index:300;
+    display:flex; align-items:center; justify-content:center;
+    padding:22px;
+    background:
+      linear-gradient(rgba(244,245,247,.9), rgba(244,245,247,.94)),
+      repeating-linear-gradient(0deg, transparent 0 23px, var(--grid-line) 23px 24px),
+      repeating-linear-gradient(90deg, transparent 0 23px, var(--grid-line) 23px 24px);
+  }
+  .login-gate-card{
+    width:min(420px, 94vw);
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:14px;
+    box-shadow:0 24px 70px rgba(27,31,39,.22);
+    padding:24px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .login-gate-card h1{
+    margin:0; display:flex; align-items:center; gap:9px; font-size:18px;
+  }
+  .login-gate-card p{ margin:0; color:var(--text-dim); font-size:13px; line-height:1.8; }
+
   .modal-backdrop{
-    position:fixed; inset:0; z-index:60;
-    background:rgba(27,31,39,.28);
+    position:fixed; inset:0; z-index:150;
+    background:rgba(27,31,39,.5);
     display:flex; align-items:center; justify-content:center;
     padding:18px;
   }
@@ -431,7 +464,7 @@
 
   /* نظام الحوارات الداخلي: Toast + نافذة تأكيد + نافذة رابط */
   #rb-toast-host{
-    position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:95;
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:310;
     display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;
   }
   .rb-toast{
@@ -529,6 +562,10 @@
       <div class="tb-group"><span class="tb-label">خلفية</span><div class="swatch-row" id="bgSwatches"></div></div>
       <div class="tb-group"><span class="tb-label">نص</span><div class="swatch-row" id="textSwatches"></div></div>
       <div class="tb-group"><span class="tb-label">إطار</span><div class="swatch-row" id="borderSwatches"></div></div>
+      <div class="tb-group">
+        <span class="tb-label">سمك الإطار (px)</span>
+        <input type="number" id="borderWidthInput" min="0" max="12" step="0.5" style="width:70px; flex:none;">
+      </div>
       <div class="tb-group"><span class="tb-label">هوفر</span><div class="swatch-row" id="hoverSwatches"></div></div>
       <div class="tb-group">
         <span class="tb-label">أنيميشن</span>
@@ -727,6 +764,19 @@
   </div>
 </div>
 
+<!-- شاشة تسجيل الدخول الإجبارية: لازم تسجّل دخول قبل ما تقدر تستخدم المحرر (إلا لو فاتح رابط مشاركة عام) -->
+<div class="login-gate hidden" id="loginGate">
+  <div class="login-gate-card">
+    <h1><span class="dot"></span> باني الخريطة</h1>
+    <p>سجّل الدخول بحساب Google الأول عشان تقدر تستخدم التطبيق، تحفظ خرائطك على Firebase، وتنشئ روابط مشاركة حية.</p>
+    <button class="google-btn" id="gateGoogleSignInBtn">
+      <span class="google-mark">G</span>
+      الدخول بحساب Google
+    </button>
+    <div class="login-status" id="gateLoginStatus">جاري تجهيز تسجيل الدخول...</div>
+  </div>
+</div>
+
 <script>
 (function(){
   const world = document.getElementById('world');
@@ -749,6 +799,7 @@
   const hInput = document.getElementById('hInput');
   const linkInput = document.getElementById('linkInput');
   const hoverEffectSelect = document.getElementById('hoverEffectSelect');
+  const borderWidthInput = document.getElementById('borderWidthInput');
   const fontFamilySelect = document.getElementById('fontFamilySelect');
   const fontSizeSelect = document.getElementById('fontSizeSelect');
   const arrowSelect = document.getElementById('arrowSelect');
@@ -825,6 +876,7 @@
     if(!node) return;
     node.el.style.background = node.bg;
     node.el.style.borderColor = node.border;
+    node.el.style.borderWidth = (node.borderWidth != null ? node.borderWidth : (node.milestone ? 2 : 1.5)) + 'px';
     node.textEl.style.color = node.color;
     node.textEl.style.fontFamily = node.fontFamily || "'IBM Plex Sans Arabic', sans-serif";
     node.textEl.style.fontSize = (node.fontSize || 14) + 'px';
@@ -878,6 +930,7 @@
     hoverEffectSelect.value = node.hoverEffect || 'lift';
     fontFamilySelect.value = node.fontFamily || "'IBM Plex Sans Arabic', sans-serif";
     fontSizeSelect.value = String(node.fontSize || 14);
+    borderWidthInput.value = node.borderWidth != null ? node.borderWidth : (node.milestone ? 2 : 1.5);
   }
 
   // ================= الشريط العلوي الثابت: ألوان + أنيميشن + شكل السهم/المسار =================
@@ -1000,6 +1053,7 @@
       bg: opts.bg || '#ffffff',
       color: opts.color || '#1b1f27',
       border: opts.border || (milestone ? '#e8542a' : '#d7dae1'),
+      borderWidth: opts.borderWidth != null ? opts.borderWidth : (milestone ? 2 : 1.5),
       hoverColor: opts.hoverColor || '#0f9d72',
       hoverEffect: opts.hoverEffect || 'lift',
       fontFamily: opts.fontFamily || "'IBM Plex Sans Arabic', sans-serif",
@@ -1610,6 +1664,14 @@
     applyNodeStyle(selectedNode);
     commitHistory();
   });
+  borderWidthInput.addEventListener('input', ()=>{
+    if(!selectedNode) return;
+    const node = nodes[selectedNode];
+    node.borderWidth = Math.max(0, Math.min(12, parseFloat(borderWidthInput.value)));
+    if(isNaN(node.borderWidth)) node.borderWidth = node.milestone ? 2 : 1.5;
+    applyNodeStyle(selectedNode);
+  });
+  borderWidthInput.addEventListener('change', ()=> selectedNode && commitHistory());
   arrowSelect.addEventListener('change', ()=>{
     if(!selectedEdge) return;
     const edge = edges.find(e=>e.id===selectedEdge);
@@ -1739,7 +1801,7 @@
       nodes: Object.keys(nodes).map(id=>{
         const n = nodes[id];
         return { id, x:n.x, y:n.y, w:n.w, h:n.h, text:n.text, milestone:n.milestone,
-          bg:n.bg, color:n.color, border:n.border, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect, fontFamily:n.fontFamily, fontSize:n.fontSize, link:n.link };
+          bg:n.bg, color:n.color, border:n.border, borderWidth:n.borderWidth, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect, fontFamily:n.fontFamily, fontSize:n.fontSize, link:n.link };
       }),
       edges: edges.map(e=> ({
         id:e.id, from:e.from, to:e.to,
@@ -1759,7 +1821,7 @@
 
     snap.nodes.forEach(n=>{
       createNode(n.x, n.y, n.text, n.milestone, n.w, n.h, {
-        bg:n.bg, color:n.color, border:n.border, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect,
+        bg:n.bg, color:n.color, border:n.border, borderWidth:n.borderWidth, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect,
         fontFamily:n.fontFamily, fontSize:n.fontSize, link:n.link
       }, n.id);
     });
@@ -1835,7 +1897,7 @@
       const safeLink = isSafeLink(n.link);
       const tag = safeLink ? 'a' : 'div';
       const linkAttrs = safeLink ? ` href="${escapeHtml(n.link)}" target="_blank" rel="noopener"` : '';
-      const style = `left:${Math.round(n.x+offX)}px; top:${Math.round(n.y+offY)}px; width:${Math.round(n.w)}px; height:${Math.round(n.h)}px; background:${n.bg}; border-color:${n.border}; --hover-c:${n.hoverColor}; --hover-c-dim:${hexToRgba(n.hoverColor,.35)};`;
+      const style = `left:${Math.round(n.x+offX)}px; top:${Math.round(n.y+offY)}px; width:${Math.round(n.w)}px; height:${Math.round(n.h)}px; background:${n.bg}; border-color:${n.border}; border-width:${n.borderWidth != null ? n.borderWidth : (n.milestone ? 2 : 1.5)}px; --hover-c:${n.hoverColor}; --hover-c-dim:${hexToRgba(n.hoverColor,.35)};`;
       return `    <${tag} class="rm-node${n.milestone ? ' rm-milestone':''} rm-hover-${n.hoverEffect||'lift'}" data-id="${id}"${linkAttrs} style="${style}">
       <div class="rm-node-text" style="color:${n.color}; font-family:${n.fontFamily || "'IBM Plex Sans Arabic', sans-serif"}; font-size:${n.fontSize || 14}px;">${escapeHtml(n.text)}</div>
     </${tag}>`;

@@ -235,6 +235,8 @@ class RoadmapApp {
     this.currentSource = 'local';
     this.readonly = false;
     this.saveTimer = null;
+    // زوار روابط المشاركة معدّيهمش لازم يسجّلوا دخول عشان يشوفوا الخريطة
+    this.isShareLink = new URLSearchParams(window.location.search).has('share');
     this.els = this.collectElements();
   }
 
@@ -256,7 +258,8 @@ class RoadmapApp {
       'backendStatus', 'diagramTitle', 'saveDiagramBtn', 'newDiagramBtn', 'dashboardBtn',
       'shareDiagramBtn', 'userBox', 'signOutBtn', 'dashboardModal', 'closeDashboardBtn',
       'diagramList', 'shareBanner', 'stage', 'googleSignInBtn', 'loginStatus',
-      'accountIconBtn', 'accountDrawer', 'accountDrawerBackdrop', 'closeAccountDrawerBtn', 'accountEmail'
+      'accountIconBtn', 'accountDrawer', 'accountDrawerBackdrop', 'closeAccountDrawerBtn', 'accountEmail',
+      'loginGate', 'gateGoogleSignInBtn', 'gateLoginStatus'
     ];
     return Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   }
@@ -268,6 +271,7 @@ class RoadmapApp {
     this.els.closeDashboardBtn.addEventListener('click', () => this.closeDashboard());
     this.els.shareDiagramBtn.addEventListener('click', () => this.shareCurrentDiagram());
     this.els.googleSignInBtn.addEventListener('click', () => this.signInWithGoogle());
+    this.els.gateGoogleSignInBtn.addEventListener('click', () => this.signInWithGoogle());
     this.els.signOutBtn.addEventListener('click', () => this.signOut());
     this.els.diagramTitle.addEventListener('change', () => this.saveNow(false));
     this.els.accountIconBtn.addEventListener('click', () => this.openAccountDrawer());
@@ -537,21 +541,27 @@ class RoadmapApp {
       this.setStatus(`سحابي: ${user.email}`);
       if(this.currentSource !== 'share') this.loadLocalActive();
     } else {
-      this.lockApp('سجّل الدخول بحساب Google عشان تحفظ خرائطك على السحاب وتنشئ روابط مشاركة حية.');
-      if(this.currentSource !== 'share') this.setStatus('محلي - غير مسجّل الدخول');
+      this.lockApp('سجّل الدخول بحساب Google عشان تقدر تستخدم التطبيق.');
+      if(this.currentSource !== 'share') this.setStatus('غير مسجّل الدخول');
     }
   }
 
-  // ملاحظة: التطبيق بقى شغال محليًا دايمًا حتى من غير تسجيل دخول — الدالتين دول بيحدّثوا
-  // حالة أيقونة/درج الحساب بس، مش بيقفلوا الواجهة زي قبل كده.
+  // تسجيل الدخول إجباري قبل استخدام التطبيق (إلا لو التطبيق فاتح رابط مشاركة عام — الزوار مش محتاجين حساب).
+  // الدالتين دول بيحدّثوا حالة الشاشة الحاجزة (loginGate) ودرج الحساب مع بعض.
   lockApp(message) {
     document.body.classList.remove('account-signed-in');
     this.els.loginStatus.textContent = message || '';
+    this.els.gateLoginStatus.textContent = message || '';
+    if(this.backend.enabled && !this.isShareLink) {
+      this.els.loginGate.classList.remove('hidden');
+    }
   }
 
   unlockApp() {
     document.body.classList.add('account-signed-in');
     this.els.loginStatus.textContent = '';
+    this.els.gateLoginStatus.textContent = '';
+    this.els.loginGate.classList.add('hidden');
   }
 
   setStatus(text) {
