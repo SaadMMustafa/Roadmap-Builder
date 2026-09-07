@@ -1,0 +1,5 @@
+output/
+node_modules/
+.env
+.firebase/
+firebase-debug.log

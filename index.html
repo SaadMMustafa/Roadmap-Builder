@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>باني المخططات — Roadmap Builder</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&family=Almarai:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
   :root{
     --bg: #f4f5f7;
@@ -332,39 +332,6 @@
   .auth-grid input{ padding:8px 9px; font-size:12px; }
   .hidden{ display:none !important; }
 
-  .login-screen{
-    position:fixed; inset:0; z-index:90;
-    display:flex; align-items:center; justify-content:center;
-    padding:22px;
-    background:
-      linear-gradient(rgba(244,245,247,.88), rgba(244,245,247,.92)),
-      repeating-linear-gradient(0deg, transparent 0 23px, var(--grid-line) 23px 24px),
-      repeating-linear-gradient(90deg, transparent 0 23px, var(--grid-line) 23px 24px);
-  }
-  .login-card{
-    width:min(420px, 94vw);
-    background:var(--panel);
-    border:1px solid var(--panel-border);
-    border-radius:14px;
-    box-shadow:0 24px 70px rgba(27,31,39,.2);
-    padding:22px;
-    display:flex; flex-direction:column; gap:14px;
-  }
-  .login-card h1{
-    margin:0;
-    display:flex; align-items:center; gap:9px;
-    font-size:18px;
-  }
-  .login-card h1::before{
-    content:""; width:10px; height:10px; border-radius:50%;
-    background:var(--accent); flex-shrink:0;
-  }
-  .login-card p{
-    margin:0;
-    color:var(--text-dim);
-    font-size:13px;
-    line-height:1.8;
-  }
   .google-btn{
     width:100%;
     display:flex; align-items:center; justify-content:center; gap:10px;
@@ -386,14 +353,52 @@
     font-size:10px;
     text-align:center;
   }
-  body.auth-locked #toolbar,
-  body.auth-locked #topBar,
-  body.auth-locked #status,
-  body.auth-locked #zoom-ctl{
-    filter:blur(2px);
-    pointer-events:none;
-    user-select:none;
+
+  /* أيقونة الحساب العلوية */
+  .account-icon-btn{
+    position:fixed; top:20px; left:20px; z-index:30;
+    width:42px; height:42px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--panel-border);
+    box-shadow:0 6px 18px #1b1f2718;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; padding:0; position:relative;
   }
+  .account-icon-btn:hover{ border-color:var(--mint); }
+  .account-icon-glyph{ font-size:18px; line-height:1; filter:grayscale(1) opacity(.75); }
+  .account-icon-btn .status-dot{
+    position:absolute; bottom:1px; left:1px;
+    width:11px; height:11px; border-radius:50%;
+    background:#9aa1b0; border:2px solid var(--panel);
+  }
+  body.account-signed-in .account-icon-btn .status-dot{ background:#0f9d72; }
+
+  .account-drawer-backdrop{
+    position:fixed; inset:0; z-index:88; background:rgba(27,31,39,.28);
+  }
+  .account-drawer{
+    position:fixed; top:0; bottom:0; left:0; z-index:89;
+    width:min(340px, 90vw); background:var(--panel);
+    box-shadow:16px 0 40px rgba(27,31,39,.22);
+    padding:18px; display:flex; flex-direction:column; gap:12px;
+    overflow-y:auto;
+    transform:translateX(-105%); transition:transform .22s ease;
+  }
+  body.account-drawer-open .account-drawer{ transform:translateX(0); }
+  .account-drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .account-drawer-head h2{ margin:0; font-size:15px; }
+  .account-section{ display:flex; flex-direction:column; gap:10px; }
+  .account-hint{ margin:0; color:var(--text-dim); font-size:12.5px; line-height:1.7; }
+  .account-identity{
+    display:flex; align-items:center; gap:8px;
+    background:#fbfbfc; border:1px solid var(--panel-border); border-radius:10px;
+    padding:10px 12px;
+  }
+  .account-email{ font-size:12.5px; font-weight:600; word-break:break-all; }
+
+  .auth-signin-section{ display:flex; }
+  .auth-account-section{ display:none; }
+  body.account-signed-in .auth-signin-section{ display:none; }
+  body.account-signed-in .auth-account-section{ display:flex; }
 
   .modal-backdrop{
     position:fixed; inset:0; z-index:60;
@@ -423,8 +428,45 @@
     padding:8px 14px; box-shadow:0 6px 20px #1b1f2718;
     font-size:12px; color:var(--text-dim);
   }
+
+  /* نظام الحوارات الداخلي: Toast + نافذة تأكيد + نافذة رابط */
+  #rb-toast-host{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:95;
+    display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;
+  }
+  .rb-toast{
+    background:#1b1f27; color:#fff; font-size:13px; font-weight:600;
+    padding:10px 18px; border-radius:10px; box-shadow:0 10px 26px #1b1f2740;
+    opacity:0; transform:translateY(8px); transition:opacity .2s, transform .2s;
+    max-width:80vw; text-align:center;
+  }
+  .rb-toast.show{ opacity:1; transform:translateY(0); }
+  .rb-toast-error{ background:#c8402a; }
+  .rb-toast-success{ background:#0f9d72; }
+
+  .rb-confirm-modal, .rb-link-modal, .png-export-modal{ width:min(420px, 92vw); }
+  .png-export-modal .png-bg-custom{ width:44px; height:38px; padding:2px; cursor:pointer; flex:none; }
+  .png-export-modal .png-custom-w, .png-export-modal .png-custom-h{ flex:1; }
+  .rb-confirm-text{ font-size:13.5px; color:var(--text-dim); line-height:1.7; margin:0; }
+  .rb-link-input{
+    flex:1; background:#fbfbfc; border:1px solid var(--node-border); border-radius:8px;
+    padding:9px 10px; font-family:var(--font-mono); font-size:12.5px; color:var(--text);
+    outline:none; direction:ltr; text-align:left;
+  }
+  .rb-link-input:focus{ border-color:var(--mint); }
+  .rb-copy-note{
+    font-size:11.5px; color:var(--mint); font-weight:600; margin-top:8px;
+    opacity:0; transition:opacity .15s; text-align:center;
+  }
+  .rb-copy-note.show{ opacity:1; }
   body.share-readonly #toolbar,
   body.share-readonly #topBar{ display:none; }
+  /* وضع المشاركة للعرض فقط: نخفي كل مقابض التحكم (تغيير الحجم، نقاط الاتصال، مقبض الانحناء) */
+  body.share-readonly .resize-handle,
+  body.share-readonly .port,
+  body.share-readonly .edge-handle{ display:none !important; }
+  body.share-readonly .node-text,
+  body.share-readonly .edge-hit{ cursor:default !important; }
 
   @media (max-width: 720px){
     #topBar{
@@ -458,7 +500,7 @@
   }
 </style>
 </head>
-<body class="auth-locked">
+<body>
 
 <div id="canvas-wrap">
   <div id="stage">
@@ -495,6 +537,28 @@
           <option value="lift">رفع خفيف</option>
           <option value="glow">توهج ناعم</option>
           <option value="pulse">نبض</option>
+        </select>
+      </div>
+      <div class="tb-group">
+        <span class="tb-label">نوع الخط</span>
+        <select id="fontFamilySelect">
+          <option value="'IBM Plex Sans Arabic', sans-serif">IBM Plex Sans Arabic</option>
+          <option value="'Cairo', sans-serif">Cairo</option>
+          <option value="'Tajawal', sans-serif">Tajawal</option>
+          <option value="'Almarai', sans-serif">Almarai</option>
+          <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+          <option value="system-ui, sans-serif">افتراضي النظام</option>
+        </select>
+      </div>
+      <div class="tb-group">
+        <span class="tb-label">حجم الخط</span>
+        <select id="fontSizeSelect">
+          <option value="11">صغير جدًا (11)</option>
+          <option value="12.5">صغير (12.5)</option>
+          <option value="14">عادي (14)</option>
+          <option value="16">كبير (16)</option>
+          <option value="18">كبير جدًا (18)</option>
+          <option value="22">عنوان (22)</option>
         </select>
       </div>
     </div>
@@ -540,24 +604,6 @@
 <div id="toolbar">
   <h1><span class="dot"></span> باني الخريطة</h1>
   <p class="hint">اكتب عنوان الخطوة وأضِفها، بعدين انقر نقرتين على العقدة عشان تحرر النص بحرية. اسحب من مقابض الزوايا الأربعة لتغيير العرض/الطول. اسحب من أي نقطة اتصال (8 نقط حوالين كل عقدة) لعقدة تانية أو لخط موجود — نقطة الخروج والدخول بتتحدد بالظبط من مكان السحب والإفلات، من غير أي إعداد يدوي تاني. اسحب من أي مكان على خط موجود عشان تعمل منه تفريع لعقدة أو خط تالت، واسحب من دائرة المقبض الصغيرة عشان تعوجّه. حدد عقدة أو خط عشان تظبط ألوانه من الشريط فوق. Ctrl+Z للتراجع.</p>
-  <div class="app-panel" id="cloudPanel">
-    <div class="mini-title">
-      <span>المشروع والحفظ</span>
-      <span class="app-status" id="backendStatus">محلي</span>
-    </div>
-    <input type="text" id="diagramTitle" placeholder="اسم الخريطة" value="خريطة جديدة">
-    <div class="row">
-      <button class="btn-primary" id="saveDiagramBtn" style="flex:1">حفظ</button>
-      <button class="btn-ghost" id="newDiagramBtn" style="flex:1">جديد</button>
-    </div>
-    <div class="row">
-      <button class="btn-ghost" id="dashboardBtn" style="flex:1">مخططاتي</button>
-      <button class="btn-accent" id="shareDiagramBtn" style="flex:1">مشاركة</button>
-    </div>
-    <div class="row hidden" id="userBox">
-      <button class="btn-ghost" id="signOutBtn" style="flex:1">خروج</button>
-    </div>
-  </div>
   <div class="row">
     <input type="text" id="nodeInput" placeholder="مثلاً: تعلّم المصفوفات...">
   </div>
@@ -601,6 +647,7 @@
 
   <hr class="sep">
   <button class="btn-accent" id="exportBtn">⬇ تصدير الخريطة (HTML+CSS+JS)</button>
+  <button class="btn-ghost" id="exportPngBtn">🖼 تصدير كصورة PNG</button>
 </div>
 
 <div id="status">
@@ -630,15 +677,53 @@
 
 <div class="share-banner hidden" id="shareBanner">وضع مشاركة للعرض فقط</div>
 
-<div class="login-screen" id="loginScreen">
-  <div class="login-card">
-    <h1>باني الخريطة</h1>
-    <p>سجّل الدخول بحساب Google عشان تحفظ خرائطك على Firebase وتفتحها من أي جهاز.</p>
+<!-- أيقونة الحساب العلوية: كل حاجة خاصة بتسجيل الدخول ولوحة "مخططاتي" بقت جواها بدل ما تكون مبعثرة في الشريط الجانبي -->
+<button class="account-icon-btn" id="accountIconBtn" title="الحساب والخريطة">
+  <span class="account-icon-glyph">👤</span>
+  <span class="status-dot"></span>
+</button>
+
+<div class="account-drawer-backdrop hidden" id="accountDrawerBackdrop"></div>
+<div class="account-drawer" id="accountDrawer">
+  <div class="account-drawer-head">
+    <h2>الحساب والخريطة</h2>
+    <button class="btn-ghost" id="closeAccountDrawerBtn">إغلاق</button>
+  </div>
+
+  <div class="account-section auth-signin-section">
+    <p class="account-hint">سجّل الدخول بحساب Google عشان تحفظ خرائطك على Firebase، تفتحها من أي جهاز، وتنشئ روابط مشاركة حية.</p>
     <button class="google-btn" id="googleSignInBtn">
       <span class="google-mark">G</span>
       الدخول بحساب Google
     </button>
-    <div class="login-status" id="loginStatus">جاري تجهيز تسجيل الدخول...</div>
+    <div class="login-status" id="loginStatus"></div>
+  </div>
+
+  <div class="account-section auth-account-section">
+    <div class="account-identity">
+      <span class="account-email" id="accountEmail"></span>
+    </div>
+    <div class="row hidden" id="userBox">
+      <button class="btn-ghost" id="signOutBtn" style="flex:1">تسجيل الخروج</button>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <div class="app-panel" id="cloudPanel">
+    <div class="mini-title">
+      <span>المشروع والحفظ</span>
+      <span class="app-status" id="backendStatus">محلي</span>
+    </div>
+    <input type="text" id="diagramTitle" placeholder="اسم الخريطة" value="خريطة جديدة">
+    <div class="row">
+      <button class="btn-primary" id="saveDiagramBtn" style="flex:1">حفظ</button>
+      <button class="btn-ghost" id="newDiagramBtn" style="flex:1">جديد</button>
+    </div>
+    <div class="row">
+      <button class="btn-ghost" id="dashboardBtn" style="flex:1">مخططاتي</button>
+      <button class="btn-accent" id="shareDiagramBtn" style="flex:1">مشاركة</button>
+    </div>
   </div>
 </div>
 
@@ -664,6 +749,8 @@
   const hInput = document.getElementById('hInput');
   const linkInput = document.getElementById('linkInput');
   const hoverEffectSelect = document.getElementById('hoverEffectSelect');
+  const fontFamilySelect = document.getElementById('fontFamilySelect');
+  const fontSizeSelect = document.getElementById('fontSizeSelect');
   const arrowSelect = document.getElementById('arrowSelect');
   const arrowSizeSelect = document.getElementById('arrowSizeSelect');
   const pathStyleSelect = document.getElementById('pathStyleSelect');
@@ -672,6 +759,7 @@
   const undoBtn = document.getElementById('undoBtn');
   const redoBtn = document.getElementById('redoBtn');
   const exportBtn = document.getElementById('exportBtn');
+  const exportPngBtn = document.getElementById('exportPngBtn');
   const topBar = document.getElementById('topBar');
   const topBarTitle = document.getElementById('topBarTitle');
   const nodeColorSection = document.getElementById('nodeColorSection');
@@ -738,6 +826,8 @@
     node.el.style.background = node.bg;
     node.el.style.borderColor = node.border;
     node.textEl.style.color = node.color;
+    node.textEl.style.fontFamily = node.fontFamily || "'IBM Plex Sans Arabic', sans-serif";
+    node.textEl.style.fontSize = (node.fontSize || 14) + 'px';
     node.el.style.setProperty('--hover-c', node.hoverColor);
     node.el.style.setProperty('--hover-c-dim', hexToRgba(node.hoverColor, .35));
     node.el.classList.remove('hover-eff-none','hover-eff-lift','hover-eff-glow','hover-eff-pulse');
@@ -786,6 +876,8 @@
       if(container._customInput && /^#/.test(node[row.key])) container._customInput.value = node[row.key];
     });
     hoverEffectSelect.value = node.hoverEffect || 'lift';
+    fontFamilySelect.value = node.fontFamily || "'IBM Plex Sans Arabic', sans-serif";
+    fontSizeSelect.value = String(node.fontSize || 14);
   }
 
   // ================= الشريط العلوي الثابت: ألوان + أنيميشن + شكل السهم/المسار =================
@@ -910,6 +1002,8 @@
       border: opts.border || (milestone ? '#e8542a' : '#d7dae1'),
       hoverColor: opts.hoverColor || '#0f9d72',
       hoverEffect: opts.hoverEffect || 'lift',
+      fontFamily: opts.fontFamily || "'IBM Plex Sans Arabic', sans-serif",
+      fontSize: opts.fontSize || 14,
       link: opts.link || ''
     };
     applyNodeStyle(id);
@@ -1504,6 +1598,18 @@
     applyNodeStyle(selectedNode);
     commitHistory();
   });
+  fontFamilySelect.addEventListener('change', ()=>{
+    if(!selectedNode) return;
+    nodes[selectedNode].fontFamily = fontFamilySelect.value;
+    applyNodeStyle(selectedNode);
+    commitHistory();
+  });
+  fontSizeSelect.addEventListener('change', ()=>{
+    if(!selectedNode) return;
+    nodes[selectedNode].fontSize = parseFloat(fontSizeSelect.value) || 14;
+    applyNodeStyle(selectedNode);
+    commitHistory();
+  });
   arrowSelect.addEventListener('change', ()=>{
     if(!selectedEdge) return;
     const edge = edges.find(e=>e.id===selectedEdge);
@@ -1633,7 +1739,7 @@
       nodes: Object.keys(nodes).map(id=>{
         const n = nodes[id];
         return { id, x:n.x, y:n.y, w:n.w, h:n.h, text:n.text, milestone:n.milestone,
-          bg:n.bg, color:n.color, border:n.border, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect, link:n.link };
+          bg:n.bg, color:n.color, border:n.border, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect, fontFamily:n.fontFamily, fontSize:n.fontSize, link:n.link };
       }),
       edges: edges.map(e=> ({
         id:e.id, from:e.from, to:e.to,
@@ -1653,7 +1759,8 @@
 
     snap.nodes.forEach(n=>{
       createNode(n.x, n.y, n.text, n.milestone, n.w, n.h, {
-        bg:n.bg, color:n.color, border:n.border, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect, link:n.link
+        bg:n.bg, color:n.color, border:n.border, hoverColor:n.hoverColor, hoverEffect:n.hoverEffect,
+        fontFamily:n.fontFamily, fontSize:n.fontSize, link:n.link
       }, n.id);
     });
     snap.edges.forEach(e=>{
@@ -1730,8 +1837,7 @@
       const linkAttrs = safeLink ? ` href="${escapeHtml(n.link)}" target="_blank" rel="noopener"` : '';
       const style = `left:${Math.round(n.x+offX)}px; top:${Math.round(n.y+offY)}px; width:${Math.round(n.w)}px; height:${Math.round(n.h)}px; background:${n.bg}; border-color:${n.border}; --hover-c:${n.hoverColor}; --hover-c-dim:${hexToRgba(n.hoverColor,.35)};`;
       return `    <${tag} class="rm-node${n.milestone ? ' rm-milestone':''} rm-hover-${n.hoverEffect||'lift'}" data-id="${id}"${linkAttrs} style="${style}">
-      <div class="rm-node-text" style="color:${n.color};">${escapeHtml(n.text)}</div>
-      <span class="rm-badge">${n.milestone ? 'أساسية' : 'اختيارية'}</span>
+      <div class="rm-node-text" style="color:${n.color}; font-family:${n.fontFamily || "'IBM Plex Sans Arabic', sans-serif"}; font-size:${n.fontSize || 14}px;">${escapeHtml(n.text)}</div>
     </${tag}>`;
     }).join('\n');
 
@@ -1784,7 +1890,7 @@ ${nodeDivs}
 </html>
 `;
 
-    const css = `@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    const css = `@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&family=Almarai:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root{
   --bg: #f4f5f7;
@@ -1826,10 +1932,6 @@ html,body{ margin:0; padding:0; background:var(--bg); font-family:'IBM Plex Sans
   display:flex; align-items:center; justify-content:center; text-align:center;
   line-height:1.5; overflow:auto; white-space:pre-wrap; word-break:break-word;
 }
-.rm-badge{
-  position:absolute; bottom:6px; left:14px; font-family:'JetBrains Mono', monospace;
-  font-size:9.5px; color:var(--text-dim);
-}
 `;
 
     const js = `// تفاعل بسيط: إبراز العقدة والروابط المتصلة بها عند مرور الفأرة
@@ -1856,9 +1958,190 @@ document.addEventListener('DOMContentLoaded', function(){
     return { html, css, js };
   }
 
+  // ================= تصدير كصورة PNG =================
+  // بنستخدم نفس مخرجات buildExport() (نفس الشكل بالظبط اللي بيتصدّر HTML) ونرسمها في عنصر مخفي
+  // بعيد عن أي تحويل Pan/Zoom حالي، عشان الصورة تطلع ثابتة بغض النظر عن وضع الكاميرا وقت التصدير.
+  let _html2canvasPromise = null;
+  function loadHtml2Canvas(){
+    if(!_html2canvasPromise){
+      _html2canvasPromise = import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm').then(m => m.default || m);
+    }
+    return _html2canvasPromise;
+  }
+
+  function buildExportFragment(){
+    const out = buildExport();
+    if(!out) return null;
+    const doc = new DOMParser().parseFromString(out.html, 'text/html');
+    const canvasEl = doc.querySelector('.rm-canvas');
+    if(!canvasEl) return null;
+    const width = parseInt(canvasEl.style.width, 10) || canvasEl.offsetWidth;
+    const height = parseInt(canvasEl.style.height, 10) || canvasEl.offsetHeight;
+    return { canvasHTML: canvasEl.outerHTML, css: out.css, width, height };
+  }
+
+  const PNG_SIZE_PRESETS = {
+    natural: null,
+    hd: { w:1280, h:720 },
+    fullhd: { w:1920, h:1080 },
+    square: { w:1080, h:1080 }
+  };
+
+  async function renderFragmentToCanvas(fragment, background, dpiScale){
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = fragment.canvasHTML;
+    const canvasNode = wrapper.firstElementChild;
+
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed; left:-99999px; top:0; pointer-events:none;';
+    const styleTag = document.createElement('style');
+    styleTag.textContent = fragment.css;
+    holder.appendChild(styleTag);
+    holder.appendChild(canvasNode);
+    document.body.appendChild(holder);
+
+    canvasNode.style.background = background === 'transparent' ? 'transparent' : background;
+
+    try{
+      const html2canvas = await loadHtml2Canvas();
+      const canvas = await html2canvas(canvasNode, {
+        backgroundColor: background === 'transparent' ? null : background,
+        scale: dpiScale,
+        width: fragment.width,
+        height: fragment.height,
+        useCORS: true
+      });
+      return canvas;
+    } finally {
+      holder.remove();
+    }
+  }
+
+  async function exportDiagramAsPng(opts){
+    const fragment = buildExportFragment();
+    if(!fragment){ rbToast('أضف عقدة واحدة على الأقل قبل التصدير.', 'error'); return; }
+
+    modeLabel.textContent = 'جاري إنشاء الصورة...';
+    try{
+      const baseCanvas = await renderFragmentToCanvas(fragment, opts.background, opts.dpiScale);
+
+      let finalCanvas = baseCanvas;
+      const preset = PNG_SIZE_PRESETS[opts.sizePreset];
+      const target = opts.sizePreset === 'custom'
+        ? { w: Math.max(64, opts.customW||baseCanvas.width), h: Math.max(64, opts.customH||baseCanvas.height) }
+        : preset;
+
+      if(target){
+        finalCanvas = document.createElement('canvas');
+        finalCanvas.width = Math.round(target.w * opts.dpiScale);
+        finalCanvas.height = Math.round(target.h * opts.dpiScale);
+        const ctx = finalCanvas.getContext('2d');
+        if(opts.background !== 'transparent'){
+          ctx.fillStyle = opts.background;
+          ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+        }
+        const scaleFit = Math.min(finalCanvas.width / baseCanvas.width, finalCanvas.height / baseCanvas.height);
+        const drawW = baseCanvas.width * scaleFit, drawH = baseCanvas.height * scaleFit;
+        const dx = (finalCanvas.width - drawW) / 2, dy = (finalCanvas.height - drawH) / 2;
+        ctx.drawImage(baseCanvas, dx, dy, drawW, drawH);
+      }
+
+      finalCanvas.toBlob(blob=>{
+        if(!blob){ rbToast('تعذر إنشاء الصورة.', 'error'); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'roadmap.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=> URL.revokeObjectURL(url), 4000);
+        rbToast('تم تنزيل الصورة.', 'success');
+      }, 'image/png');
+    } catch(err){
+      console.error(err);
+      rbToast('تعذر إنشاء الصورة. تأكد من اتصالك بالإنترنت (لازم لتحميل مكتبة الرسم أول مرة).', 'error');
+    } finally {
+      modeLabel.textContent = 'جاهز';
+    }
+  }
+
+  function openPngExportDialog(){
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal png-export-modal">
+        <div class="modal-head"><h2>تصدير كصورة PNG</h2><button type="button" class="btn-ghost png-close">إغلاق</button></div>
+
+        <div class="field-label">الخلفية</div>
+        <div class="row">
+          <select class="png-bg-preset">
+            <option value="#ffffff">أبيض</option>
+            <option value="transparent">شفافة</option>
+            <option value="custom">لون مخصص</option>
+          </select>
+          <input type="color" class="png-bg-custom hidden" value="#ffffff">
+        </div>
+
+        <div class="field-label" style="margin-top:10px">حجم التصدير</div>
+        <div class="row">
+          <select class="png-size-preset">
+            <option value="natural">الحجم الطبيعي للمخطط</option>
+            <option value="hd">HD — 1280×720</option>
+            <option value="fullhd">Full HD — 1920×1080</option>
+            <option value="square">مربع (سوشيال ميديا) — 1080×1080</option>
+            <option value="custom">مخصص</option>
+          </select>
+        </div>
+        <div class="row png-custom-size hidden" style="margin-top:8px">
+          <input type="number" class="png-custom-w" placeholder="العرض (px)" min="64" value="1600">
+          <input type="number" class="png-custom-h" placeholder="الطول (px)" min="64" value="900">
+        </div>
+
+        <div class="field-label" style="margin-top:10px">الدقة (Resolution)</div>
+        <div class="row">
+          <select class="png-dpi">
+            <option value="1">عادية (1×)</option>
+            <option value="2" selected>عالية الدقة (2×) — موصى بها</option>
+            <option value="3">فائقة الدقة (3×)</option>
+          </select>
+        </div>
+
+        <button type="button" class="btn-accent png-go" style="margin-top:16px">⬇ تنزيل الصورة</button>
+      </div>`;
+    document.body.appendChild(backdrop);
+
+    const bgPreset = backdrop.querySelector('.png-bg-preset');
+    const bgCustom = backdrop.querySelector('.png-bg-custom');
+    const sizePreset = backdrop.querySelector('.png-size-preset');
+    const customSizeRow = backdrop.querySelector('.png-custom-size');
+    const customW = backdrop.querySelector('.png-custom-w');
+    const customH = backdrop.querySelector('.png-custom-h');
+    const dpiSelect = backdrop.querySelector('.png-dpi');
+
+    bgPreset.addEventListener('change', ()=> bgCustom.classList.toggle('hidden', bgPreset.value !== 'custom'));
+    sizePreset.addEventListener('change', ()=> customSizeRow.classList.toggle('hidden', sizePreset.value !== 'custom'));
+
+    function close(){ backdrop.remove(); }
+    backdrop.querySelector('.png-close').addEventListener('click', close);
+    backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+
+    backdrop.querySelector('.png-go').addEventListener('click', ()=>{
+      const background = bgPreset.value === 'custom' ? bgCustom.value : bgPreset.value;
+      exportDiagramAsPng({
+        background,
+        sizePreset: sizePreset.value,
+        customW: parseInt(customW.value,10) || 1600,
+        customH: parseInt(customH.value,10) || 900,
+        dpiScale: parseFloat(dpiSelect.value) || 2
+      });
+      close();
+    });
+  }
+
+  exportPngBtn.addEventListener('click', openPngExportDialog);
+
+
   exportBtn.addEventListener('click', ()=>{
     const out = buildExport();
-    if(!out){ alert('أضف عقدة واحدة على الأقل قبل التصدير.'); return; }
+    if(!out){ rbToast('أضف عقدة واحدة على الأقل قبل التصدير.', 'error'); return; }
     downloadFile('index.html', out.html, 'text/html');
     setTimeout(()=> downloadFile('style.css', out.css, 'text/css'), 250);
     setTimeout(()=> downloadFile('script.js', out.js, 'text/javascript'), 500);
@@ -1899,6 +2182,82 @@ document.addEventListener('DOMContentLoaded', function(){
     commitHistory();
   }
 
+  // ================= نظام حوارات داخل التطبيق (بدل alert/confirm/prompt الافتراضية في المتصفح) =================
+  const toastHost = document.createElement('div');
+  toastHost.id = 'rb-toast-host';
+  document.body.appendChild(toastHost);
+
+  function rbToast(message, type){
+    const el = document.createElement('div');
+    el.className = 'rb-toast' + (type ? ' rb-toast-' + type : '');
+    el.textContent = message;
+    toastHost.appendChild(el);
+    requestAnimationFrame(()=> el.classList.add('show'));
+    setTimeout(()=>{
+      el.classList.remove('show');
+      setTimeout(()=> el.remove(), 250);
+    }, 3200);
+  }
+
+  function rbConfirm(message){
+    return new Promise(resolve=>{
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.innerHTML = `
+        <div class="modal rb-confirm-modal">
+          <div class="modal-head"><h2>تأكيد</h2></div>
+          <p class="rb-confirm-text"></p>
+          <div class="row" style="margin-top:14px">
+            <button type="button" class="btn-ghost rb-cancel" style="flex:1">إلغاء</button>
+            <button type="button" class="btn-danger rb-ok" style="flex:1">تأكيد</button>
+          </div>
+        </div>`;
+      backdrop.querySelector('.rb-confirm-text').textContent = message;
+      document.body.appendChild(backdrop);
+      function close(result){ backdrop.remove(); resolve(result); }
+      backdrop.querySelector('.rb-cancel').addEventListener('click', ()=> close(false));
+      backdrop.querySelector('.rb-ok').addEventListener('click', ()=> close(true));
+      backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(false); });
+    });
+  }
+
+  function rbShowLink(title, url){
+    return new Promise(resolve=>{
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.innerHTML = `
+        <div class="modal rb-link-modal">
+          <div class="modal-head"><h2></h2><button type="button" class="btn-ghost rb-close">إغلاق</button></div>
+          <div class="row" style="margin-top:10px">
+            <input type="text" readonly class="rb-link-input">
+            <button type="button" class="btn-primary rb-copy">نسخ</button>
+          </div>
+          <div class="rb-copy-note">تم النسخ ✓</div>
+        </div>`;
+      backdrop.querySelector('h2').textContent = title;
+      const input = backdrop.querySelector('.rb-link-input');
+      input.value = url;
+      document.body.appendChild(backdrop);
+      function close(){ backdrop.remove(); resolve(); }
+      backdrop.querySelector('.rb-close').addEventListener('click', close);
+      backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+      const note = backdrop.querySelector('.rb-copy-note');
+      backdrop.querySelector('.rb-copy').addEventListener('click', async ()=>{
+        try{
+          await navigator.clipboard.writeText(url);
+          note.classList.add('show');
+          setTimeout(()=> note.classList.remove('show'), 1800);
+        } catch(err){
+          input.focus(); input.select();
+        }
+      });
+      input.addEventListener('click', ()=>{ input.focus(); input.select(); });
+      setTimeout(()=>{ input.focus(); input.select(); }, 50);
+    });
+  }
+
+  window.RoadmapUI = { toast: rbToast, confirm: rbConfirm, showLink: rbShowLink };
+
   window.RoadmapBuilder = {
     getState: function(){ return snapshotState(); },
     loadState: loadDocumentState,
@@ -1906,7 +2265,7 @@ document.addEventListener('DOMContentLoaded', function(){
     exportFiles: buildExport,
     downloadCurrentExport: function(){
       const out = buildExport();
-      if(!out){ alert('أضف عقدة واحدة على الأقل قبل التصدير.'); return; }
+      if(!out){ rbToast('أضف عقدة واحدة على الأقل قبل التصدير.', 'error'); return; }
       downloadFile('index.html', out.html, 'text/html');
       setTimeout(()=> downloadFile('style.css', out.css, 'text/css'), 250);
       setTimeout(()=> downloadFile('script.js', out.js, 'text/javascript'), 500);

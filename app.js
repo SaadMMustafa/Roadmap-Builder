@@ -255,7 +255,8 @@ class RoadmapApp {
     const ids = [
       'backendStatus', 'diagramTitle', 'saveDiagramBtn', 'newDiagramBtn', 'dashboardBtn',
       'shareDiagramBtn', 'userBox', 'signOutBtn', 'dashboardModal', 'closeDashboardBtn',
-      'diagramList', 'shareBanner', 'stage', 'loginScreen', 'googleSignInBtn', 'loginStatus'
+      'diagramList', 'shareBanner', 'stage', 'googleSignInBtn', 'loginStatus',
+      'accountIconBtn', 'accountDrawer', 'accountDrawerBackdrop', 'closeAccountDrawerBtn', 'accountEmail'
     ];
     return Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   }
@@ -269,6 +270,19 @@ class RoadmapApp {
     this.els.googleSignInBtn.addEventListener('click', () => this.signInWithGoogle());
     this.els.signOutBtn.addEventListener('click', () => this.signOut());
     this.els.diagramTitle.addEventListener('change', () => this.saveNow(false));
+    this.els.accountIconBtn.addEventListener('click', () => this.openAccountDrawer());
+    this.els.closeAccountDrawerBtn.addEventListener('click', () => this.closeAccountDrawer());
+    this.els.accountDrawerBackdrop.addEventListener('click', () => this.closeAccountDrawer());
+  }
+
+  openAccountDrawer() {
+    document.body.classList.add('account-drawer-open');
+    this.els.accountDrawerBackdrop.classList.remove('hidden');
+  }
+
+  closeAccountDrawer() {
+    document.body.classList.remove('account-drawer-open');
+    this.els.accountDrawerBackdrop.classList.add('hidden');
   }
 
   bindAutosave() {
@@ -288,7 +302,9 @@ class RoadmapApp {
     if(window.location.protocol === 'file:') {
       // تسجيل الدخول بـ Firebase مستحيل يشتغل وأنت فاتح الملف مباشرة (file://) — لازم يتقدّم من خلال سيرفر http/https.
       this.setStatus('لازم تشغيل الصفحة من سيرفر');
-      this.lockApp('افتح المشروع عن طريق سيرفر محلي (مثلاً: python -m http.server) أو من دومين حقيقي — تسجيل الدخول لا يعمل مع فتح الملف مباشرة (file://).');
+      const msg = 'افتح المشروع عن طريق سيرفر محلي (مثلاً: python -m http.server) أو من دومين حقيقي — تسجيل الدخول لا يعمل مع فتح الملف مباشرة (file://).';
+      this.lockApp(msg);
+      window.RoadmapUI.toast(msg, 'error');
       return;
     }
     try {
@@ -300,8 +316,10 @@ class RoadmapApp {
     } catch(err) {
       console.error(err);
       const detail = err && (err.code || err.message) ? ` (${err.code || err.message})` : '';
+      const msg = `تعذر الاتصال بـ Firebase${detail}. راجع إعدادات المشروع، والدومين المصرّح في Authentication -> Settings -> Authorized domains.`;
       this.setStatus('تعذر تفعيل Firebase');
-      this.lockApp(`تعذر الاتصال بـ Firebase${detail}. راجع إعدادات المشروع، والدومين المصرّح في Authentication -> Settings -> Authorized domains.`);
+      this.lockApp(msg);
+      window.RoadmapUI.toast(msg, 'error');
     }
   }
 
@@ -463,7 +481,7 @@ class RoadmapApp {
   }
 
   async deleteDiagram(item) {
-    const ok = window.confirm('حذف هذه الخريطة؟');
+    const ok = await window.RoadmapUI.confirm('حذف هذه الخريطة؟');
     if(!ok) return;
     if(item.source === 'cloud' && this.backend.user) await this.backend.deleteDiagram(item.id);
     this.local.delete(item.id);
@@ -472,11 +490,11 @@ class RoadmapApp {
 
   async shareCurrentDiagram() {
     if(!this.backend.enabled) {
-      alert('أضف إعدادات Firebase أولًا لتفعيل روابط المشاركة الحية.');
+      window.RoadmapUI.toast('أضف إعدادات Firebase أولًا لتفعيل روابط المشاركة الحية.', 'error');
       return;
     }
     if(!this.backend.user) {
-      alert('سجّل الدخول أولًا قبل إنشاء رابط مشاركة.');
+      window.RoadmapUI.toast('سجّل الدخول أولًا قبل إنشاء رابط مشاركة.', 'error');
       return;
     }
     const record = this.getCurrentRecord();
@@ -484,9 +502,8 @@ class RoadmapApp {
     const url = new URL(window.location.href);
     url.search = '';
     url.searchParams.set('share', token);
-    await copyText(url.toString());
-    this.setStatus('تم نسخ رابط المشاركة');
-    alert('تم إنشاء ونسخ رابط المشاركة:\n' + url.toString());
+    this.setStatus('تم إنشاء رابط المشاركة');
+    await window.RoadmapUI.showLink('رابط مشاركة الخريطة', url.toString());
   }
 
   async signInWithGoogle() {
@@ -513,26 +530,27 @@ class RoadmapApp {
   applyAuthState(user) {
     const isSignedIn = Boolean(user);
     this.els.userBox.classList.toggle('hidden', !isSignedIn);
+    if(this.els.accountEmail) this.els.accountEmail.textContent = isSignedIn ? user.email : '';
     if(user) {
       this.backend.ensureUserProfile(user).catch(console.error);
       this.unlockApp();
       this.setStatus(`سحابي: ${user.email}`);
       if(this.currentSource !== 'share') this.loadLocalActive();
-    } else if(this.currentSource !== 'share') {
-      this.lockApp('سجّل الدخول بحساب Google للبدء.');
-      this.setStatus('Firebase جاهز - سجّل الدخول');
+    } else {
+      this.lockApp('سجّل الدخول بحساب Google عشان تحفظ خرائطك على السحاب وتنشئ روابط مشاركة حية.');
+      if(this.currentSource !== 'share') this.setStatus('محلي - غير مسجّل الدخول');
     }
   }
 
+  // ملاحظة: التطبيق بقى شغال محليًا دايمًا حتى من غير تسجيل دخول — الدالتين دول بيحدّثوا
+  // حالة أيقونة/درج الحساب بس، مش بيقفلوا الواجهة زي قبل كده.
   lockApp(message) {
-    document.body.classList.add('auth-locked');
-    this.els.loginScreen.classList.remove('hidden');
+    document.body.classList.remove('account-signed-in');
     this.els.loginStatus.textContent = message || '';
   }
 
   unlockApp() {
-    document.body.classList.remove('auth-locked');
-    this.els.loginScreen.classList.add('hidden');
+    document.body.classList.add('account-signed-in');
     this.els.loginStatus.textContent = '';
   }
 
@@ -566,14 +584,6 @@ function mergeRecords(localItems, cloudItems) {
   localItems.forEach(item => map.set(item.id, item));
   cloudItems.forEach(item => map.set(item.id, item));
   return Array.from(map.values()).sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt));
-}
-
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    window.prompt('انسخ الرابط:', text);
-  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
