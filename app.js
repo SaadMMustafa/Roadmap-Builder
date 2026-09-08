@@ -280,6 +280,10 @@ class RoadmapApp {
   }
 
   openAccountDrawer() {
+    // نقفل قائمة العقد أولًا لو مفتوحة عشان الاثنين مايتصادموش بصريًا (بيسحبوا من نفس الجانب)
+    document.body.classList.remove('nodes-list-open');
+    const nodesListBackdrop = document.getElementById('nodesListBackdrop');
+    if(nodesListBackdrop) nodesListBackdrop.classList.add('hidden');
     document.body.classList.add('account-drawer-open');
     this.els.accountDrawerBackdrop.classList.remove('hidden');
   }

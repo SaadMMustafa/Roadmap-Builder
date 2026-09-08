@@ -97,6 +97,17 @@
   .node.selected{
     box-shadow: 0 0 0 3px var(--mint-dim), 0 4px 14px #1b1f2720;
   }
+  .node.multi-selected{
+    box-shadow: 0 0 0 2px var(--mint), 0 4px 14px #1b1f2720;
+    outline: 2px dashed var(--mint);
+    outline-offset: 3px;
+  }
+  .marquee-box{
+    position:absolute; z-index:5;
+    background: var(--mint-dim);
+    border: 1.5px dashed var(--mint);
+    pointer-events:none;
+  }
   .node.hover-eff-lift:hover{ transform:translateY(-3px); border-color:var(--hover-c, var(--node-border)); box-shadow:0 8px 20px var(--hover-c-dim, #0f9d7233), 0 2px 6px #1b1f2714; }
   .node.hover-eff-glow:hover{ border-color:var(--hover-c, var(--node-border)); box-shadow:0 0 0 5px var(--hover-c-dim, #0f9d7233), 0 4px 14px #1b1f2718; }
   .node.hover-eff-pulse:hover{ border-color:var(--hover-c, var(--node-border)); animation: nodePulse 1.3s ease-in-out infinite; }
@@ -381,6 +392,25 @@
   }
   body.account-signed-in .account-icon-btn .status-dot{ background:#0f9d72; }
 
+  .nodes-list-icon-btn{ left:74px; font-size:16px; }
+
+  .nodes-list-body{ display:flex; flex-direction:column; gap:6px; }
+  .nodes-list-row{
+    display:flex; align-items:center; gap:8px;
+    background:#fbfbfc; border:1px solid var(--panel-border); border-radius:9px;
+    padding:8px 10px; cursor:pointer; user-select:none;
+  }
+  .nodes-list-row:hover{ border-color:var(--mint); }
+  .nodes-list-row.dragging{ opacity:.4; }
+  .nl-handle{ cursor:grab; color:var(--text-dim); font-size:13px; flex-shrink:0; }
+  .nl-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .nl-text{ flex:1; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nl-del{
+    background:transparent; border:none; color:var(--text-dim); font-size:12px;
+    cursor:pointer; padding:2px 6px; border-radius:6px; flex-shrink:0;
+  }
+  .nl-del:hover{ background:#c8402a15; color:#c8402a; }
+
   .account-drawer-backdrop{
     position:fixed; inset:0; z-index:88; background:rgba(27,31,39,.28);
   }
@@ -392,7 +422,8 @@
     overflow-y:auto;
     transform:translateX(-105%); transition:transform .22s ease;
   }
-  body.account-drawer-open .account-drawer{ transform:translateX(0); }
+  body.account-drawer-open #accountDrawer{ transform:translateX(0); }
+  body.nodes-list-open #nodesListPanel{ transform:translateX(0); }
   .account-drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
   .account-drawer-head h2{ margin:0; font-size:15px; }
   .account-section{ display:flex; flex-direction:column; gap:10px; }
@@ -726,6 +757,21 @@
   <span class="status-dot"></span>
 </button>
 
+<!-- أيقونة قائمة العقد (زي List View في ووردبريس جوتنبرج) -->
+<button class="account-icon-btn nodes-list-icon-btn" id="nodesListBtn" title="قائمة العقد">
+  <span class="account-icon-glyph">☰</span>
+</button>
+
+<div class="account-drawer-backdrop hidden" id="nodesListBackdrop"></div>
+<div class="account-drawer nodes-list-panel" id="nodesListPanel">
+  <div class="account-drawer-head">
+    <h2>قائمة العقد</h2>
+    <button class="btn-ghost" id="closeNodesListBtn">إغلاق</button>
+  </div>
+  <p class="account-hint">اسحب من ⋮⋮ لإعادة ترتيب العقد فوق بعض (الأعلى في القائمة = الأعلى ظهورًا). اضغط على أي عقدة للانتقال إليها وتحديدها.</p>
+  <div class="nodes-list-body" id="nodesListBody"></div>
+</div>
+
 <div class="account-drawer-backdrop hidden" id="accountDrawerBackdrop"></div>
 <div class="account-drawer" id="accountDrawer">
   <div class="account-drawer-head">
@@ -765,6 +811,14 @@
       <button type="button" class="defaults-tab" data-profile="milestone">عقدة أساسية</button>
     </div>
 
+    <div class="tb-group">
+      <span class="tb-label">العرض (px)</span>
+      <input type="number" id="defWidthInput" min="60" step="4" style="width:70px; flex:none;">
+    </div>
+    <div class="tb-group">
+      <span class="tb-label">الطول (px)</span>
+      <input type="number" id="defHeightInput" min="34" step="4" style="width:70px; flex:none;">
+    </div>
     <div class="tb-group"><span class="tb-label">خلفية</span><div class="swatch-row" id="defBgSwatches"></div></div>
     <div class="tb-group"><span class="tb-label">نص</span><div class="swatch-row" id="defTextSwatches"></div></div>
     <div class="tb-group"><span class="tb-label">إطار</span><div class="swatch-row" id="defBorderSwatches"></div></div>
@@ -937,6 +991,8 @@
     { id:'defHoverSwatches', key:'hoverColor' }
   ];
   const defBorderWidthInput = document.getElementById('defBorderWidthInput');
+  const defWidthInput = document.getElementById('defWidthInput');
+  const defHeightInput = document.getElementById('defHeightInput');
   const defHoverEffectSelect = document.getElementById('defHoverEffectSelect');
   const defFontFamilySelect = document.getElementById('defFontFamilySelect');
   const defFontSizeSelect = document.getElementById('defFontSizeSelect');
@@ -1004,6 +1060,8 @@
       if(container._customInput && /^#/.test(dflt[row.key])) container._customInput.value = dflt[row.key];
     });
     defBorderWidthInput.value = dflt.borderWidth;
+    defWidthInput.value = dflt.w;
+    defHeightInput.value = dflt.h;
     defHoverEffectSelect.value = dflt.hoverEffect;
     defFontFamilySelect.value = dflt.fontFamily;
     defFontSizeSelect.value = String(dflt.fontSize);
@@ -1031,6 +1089,16 @@
     activeNodeDefaults().borderWidth = isNaN(v) ? activeNodeDefaults().borderWidth : Math.max(0, Math.min(12, v));
   });
   defBorderWidthInput.addEventListener('change', ()=>{ saveLastUsedDefaults(); commitHistory(); });
+  defWidthInput.addEventListener('input', ()=>{
+    const v = parseInt(defWidthInput.value, 10);
+    if(!isNaN(v)) activeNodeDefaults().w = Math.max(MIN_W, v);
+  });
+  defWidthInput.addEventListener('change', ()=>{ saveLastUsedDefaults(); commitHistory(); });
+  defHeightInput.addEventListener('input', ()=>{
+    const v = parseInt(defHeightInput.value, 10);
+    if(!isNaN(v)) activeNodeDefaults().h = Math.max(MIN_H, v);
+  });
+  defHeightInput.addEventListener('change', ()=>{ saveLastUsedDefaults(); commitHistory(); });
   defHoverEffectSelect.addEventListener('change', ()=>{
     activeNodeDefaults().hoverEffect = defHoverEffectSelect.value;
     saveLastUsedDefaults(); commitHistory();
@@ -1082,6 +1150,7 @@
   // الإعدادات الافتراضية لأي عنصر جديد يتضاف — جزء من بيانات المخطط نفسه (بتتحفظ وتترجع معاه)،
   // ولو مفيش مخطط لسه (أول مرة) بناخد آخر إعداد افتراضي المستخدم دخّله من localStorage.
   const FACTORY_NODE_DEFAULTS = {
+    w:180, h:64,
     bg:'#ffffff', color:'#1b1f27', border:'#d7dae1', borderWidth:1.5,
     hoverColor:'#0f9d72', hoverEffect:'lift',
     fontFamily:"'IBM Plex Sans Arabic', sans-serif", fontSize:14
@@ -1109,6 +1178,8 @@
   let edgeDefaults = { ...FACTORY_EDGE_DEFAULTS, ...(lastUsed && lastUsed.edgeDefaults) };
   let selectedNode = null;
   let selectedEdge = null;
+  let multiSelectedIds = new Set(); // تحديد متعدد للعقد عن طريق الماوس (Marquee) — لنقل مجموعة عقد مع بعض
+  let spaceHeld = false; // مسافة مضغوطة = تحريك الكانفاس (Pan) بدل التحديد بالمستطيل
   let isMilestoneMode = false;
   let snapEnabled = true;
 
@@ -1337,7 +1408,14 @@
     applyNodeStyle(id);
 
     textEl.addEventListener('pointerdown', (e)=> startNodeDrag(e, id));
-    el.addEventListener('click', (e)=>{ e.stopPropagation(); selectNode(id); });
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(e.shiftKey){
+        toggleMultiSelect(id);
+      } else if(!(multiSelectedIds.has(id) && multiSelectedIds.size > 1)){
+        selectNode(id);
+      }
+    });
     textEl.addEventListener('dblclick', (e)=>{ e.stopPropagation(); enterEditMode(id); });
 
     updateCounts();
@@ -1378,9 +1456,17 @@
   function startNodeDrag(e, id){
     e.stopPropagation();
     const node = nodes[id];
-    bringToFront(id);
-    selectNode(id);
-    dragState = { id, moved:false, startClientX: e.clientX, startClientY: e.clientY, startX: node.x, startY: node.y };
+    // لو العقدة دي جزء من تحديد متعدد، نسحب المجموعة كلها مع بعض من غير ما نلغي التحديد
+    if(multiSelectedIds.has(id) && multiSelectedIds.size > 1){
+      bringToFront(id);
+      const group = {};
+      multiSelectedIds.forEach(gid=>{ bringToFront(gid); group[gid] = { startX: nodes[gid].x, startY: nodes[gid].y }; });
+      dragState = { id, group, moved:false, startClientX: e.clientX, startClientY: e.clientY };
+    } else {
+      bringToFront(id);
+      selectNode(id);
+      dragState = { id, group:null, moved:false, startClientX: e.clientX, startClientY: e.clientY, startX: node.x, startY: node.y };
+    }
     window.addEventListener('pointermove', onNodeDrag);
     window.addEventListener('pointerup', endNodeDrag);
   }
@@ -1391,11 +1477,22 @@
     }
     const dx = (e.clientX - dragState.startClientX) / scale;
     const dy = (e.clientY - dragState.startClientY) / scale;
-    const node = nodes[dragState.id];
-    node.x = snap(dragState.startX + dx);
-    node.y = snap(dragState.startY + dy);
-    node.el.style.left = node.x + 'px';
-    node.el.style.top = node.y + 'px';
+    if(dragState.group){
+      Object.keys(dragState.group).forEach(gid=>{
+        const node = nodes[gid];
+        const start = dragState.group[gid];
+        node.x = snap(start.startX + dx);
+        node.y = snap(start.startY + dy);
+        node.el.style.left = node.x + 'px';
+        node.el.style.top = node.y + 'px';
+      });
+    } else {
+      const node = nodes[dragState.id];
+      node.x = snap(dragState.startX + dx);
+      node.y = snap(dragState.startY + dy);
+      node.el.style.left = node.x + 'px';
+      node.el.style.top = node.y + 'px';
+    }
     updateEdgesFor(dragState.id);
   }
   function endNodeDrag(){
@@ -1849,9 +1946,12 @@
       const edge = edges.find(e=>e.id===selectedEdge);
       if(edge) edge.groupEl.classList.remove('selected');
     }
+    multiSelectedIds.forEach(id=>{ if(nodes[id]) nodes[id].el.classList.remove('multi-selected'); });
+    multiSelectedIds.clear();
     selectedNode = null; selectedEdge = null;
     propsPanel.style.display = 'none';
     refreshTopBar();
+    if(modeLabel.textContent.startsWith('محدد')) modeLabel.textContent = 'جاهز';
   }
   // كل الخطوط اللي متفرّعة من رابط معيّن (بشكل متسلسل) — عشان محذفش خط ويسيب فروعه معلّقة
   function collectDependentEdgeIds(edgeId, seen){
@@ -1872,7 +1972,16 @@
     });
   }
   function deleteSelected(){
-    if(selectedNode){
+    if(multiSelectedIds.size > 0){
+      const nodeIds = [...multiSelectedIds];
+      const directIds = edges.filter(e=> nodeIds.includes(e.from) || nodeIds.includes(e.to)).map(e=>e.id);
+      const allEdgeIds = new Set(directIds);
+      directIds.forEach(eid=> collectDependentEdgeIds(eid, allEdgeIds));
+      removeEdgesByIds(allEdgeIds);
+      nodeIds.forEach(id=>{ if(nodes[id]){ nodes[id].el.remove(); delete nodes[id]; } });
+      multiSelectedIds.clear();
+      modeLabel.textContent = 'جاهز';
+    } else if(selectedNode){
       const id = selectedNode;
       const directIds = edges.filter(e=> e.from===id || e.to===id).map(e=>e.id);
       const allIds = new Set(directIds);
@@ -1895,9 +2004,44 @@
     commitHistory();
   }
 
+  // ---------- نسخ ولصق العقد (تدعم عقدة واحدة أو مجموعة تحديد متعدد) ----------
+  let clipboardNodes = null;
+  function copySelectionToClipboard(){
+    const ids = multiSelectedIds.size > 0 ? [...multiSelectedIds] : (selectedNode ? [selectedNode] : []);
+    if(ids.length === 0) return false;
+    clipboardNodes = ids.map(id=>{
+      const n = nodes[id];
+      return {
+        x:n.x, y:n.y, w:n.w, h:n.h, text:n.text, milestone:n.milestone,
+        bg:n.bg, color:n.color, border:n.border, borderWidth:n.borderWidth,
+        hoverColor:n.hoverColor, hoverEffect:n.hoverEffect,
+        fontFamily:n.fontFamily, fontSize:n.fontSize, link:n.link
+      };
+    });
+    return true;
+  }
+  function pasteClipboard(){
+    if(!clipboardNodes || !clipboardNodes.length) return;
+    const OFFSET = 32;
+    const newIds = clipboardNodes.map(data=> createNode(
+      snap(data.x + OFFSET), snap(data.y + OFFSET), data.text, data.milestone, data.w, data.h,
+      {
+        bg:data.bg, color:data.color, border:data.border, borderWidth:data.borderWidth,
+        hoverColor:data.hoverColor, hoverEffect:data.hoverEffect,
+        fontFamily:data.fontFamily, fontSize:data.fontSize, link:data.link
+      }
+    ));
+    // نحدّث إحداثيات الحافظة عشان لصقة تانية تبعد أكتر بدل ما تترصّ فوق بعض
+    clipboardNodes = clipboardNodes.map(d=> ({ ...d, x:d.x+OFFSET, y:d.y+OFFSET }));
+    setMultiSelection(newIds);
+    updateCounts();
+    commitHistory();
+  }
+
   function updateCounts(){
     cNodesEl.textContent = Object.keys(nodes).length;
     cEdgesEl.textContent = edges.length;
+    if(document.body.classList.contains('nodes-list-open')) buildNodesListPanel();
   }
 
   wInput.addEventListener('input', ()=>{
@@ -1982,11 +2126,15 @@
   let panState = null;
   stage.addEventListener('pointerdown', (e)=>{
     if(e.target !== stage && e.target.id !== 'canvas-wrap' && e.target.id !== 'grid') return;
-    clearSelection();
-    panState = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
-    stage.classList.add('panning');
-    window.addEventListener('pointermove', onPan);
-    window.addEventListener('pointerup', endPan);
+    if(spaceHeld){
+      clearSelection();
+      panState = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
+      stage.classList.add('panning');
+      window.addEventListener('pointermove', onPan);
+      window.addEventListener('pointerup', endPan);
+    } else {
+      startMarquee(e);
+    }
   });
   function onPan(e){
     if(!panState) return;
@@ -2000,6 +2148,95 @@
     window.removeEventListener('pointermove', onPan);
     window.removeEventListener('pointerup', endPan);
   }
+
+  // ---------- تحديد أكثر من عقدة بالسحب المستطيلي (Marquee) ----------
+  let marqueeState = null;
+  let marqueeEl = null;
+  function startMarquee(e){
+    const startPt = stagePoint(e.clientX, e.clientY);
+    marqueeState = { startPt, curPt: startPt, moved:false };
+    marqueeEl = document.createElement('div');
+    marqueeEl.className = 'marquee-box';
+    world.appendChild(marqueeEl);
+    updateMarqueeVisual();
+    window.addEventListener('pointermove', onMarqueeMove);
+    window.addEventListener('pointerup', endMarquee);
+  }
+  function updateMarqueeVisual(){
+    const { startPt, curPt } = marqueeState;
+    const x = Math.min(startPt.x, curPt.x), y = Math.min(startPt.y, curPt.y);
+    const w = Math.abs(curPt.x - startPt.x), h = Math.abs(curPt.y - startPt.y);
+    marqueeEl.style.left = x + 'px';
+    marqueeEl.style.top = y + 'px';
+    marqueeEl.style.width = w + 'px';
+    marqueeEl.style.height = h + 'px';
+  }
+  function onMarqueeMove(e){
+    if(!marqueeState) return;
+    marqueeState.curPt = stagePoint(e.clientX, e.clientY);
+    if(Math.abs(marqueeState.curPt.x - marqueeState.startPt.x) > 3 || Math.abs(marqueeState.curPt.y - marqueeState.startPt.y) > 3){
+      marqueeState.moved = true;
+    }
+    updateMarqueeVisual();
+  }
+  function endMarquee(){
+    window.removeEventListener('pointermove', onMarqueeMove);
+    window.removeEventListener('pointerup', endMarquee);
+    if(marqueeEl){ marqueeEl.remove(); marqueeEl = null; }
+    if(!marqueeState) return;
+    const { startPt, curPt, moved } = marqueeState;
+    marqueeState = null;
+    if(!moved){ clearSelection(); return; } // ضغطة عادية من غير سحب حقيقي = إلغاء التحديد
+    const rx = Math.min(startPt.x, curPt.x), ry = Math.min(startPt.y, curPt.y);
+    const rw = Math.abs(curPt.x - startPt.x), rh = Math.abs(curPt.y - startPt.y);
+    const picked = Object.keys(nodes).filter(id=>{
+      const n = nodes[id];
+      return n.x < rx+rw && n.x+n.w > rx && n.y < ry+rh && n.y+n.h > ry;
+    });
+    setMultiSelection(picked);
+  }
+  function setMultiSelection(ids){
+    clearSelection();
+    if(ids.length === 0) return;
+    if(ids.length === 1){ selectNode(ids[0]); return; }
+    ids.forEach(id=>{ multiSelectedIds.add(id); nodes[id].el.classList.add('multi-selected'); });
+    modeLabel.textContent = `محدد ${ids.length} عقدة`;
+  }
+  // Shift+click على عقدة: إضافة/إزالة من التحديد المتعدد من غير ما تلغي الباقي
+  function toggleMultiSelect(id){
+    if(multiSelectedIds.size === 0 && selectedNode && selectedNode !== id){
+      const prev = selectedNode;
+      clearSelection();
+      multiSelectedIds.add(prev);
+      nodes[prev].el.classList.add('multi-selected');
+    }
+    if(multiSelectedIds.has(id)){
+      multiSelectedIds.delete(id);
+      nodes[id].el.classList.remove('multi-selected');
+    } else {
+      multiSelectedIds.add(id);
+      nodes[id].el.classList.add('multi-selected');
+    }
+    if(multiSelectedIds.size === 1){
+      const only = [...multiSelectedIds][0];
+      multiSelectedIds.clear();
+      nodes[only].el.classList.remove('multi-selected');
+      selectNode(only);
+      return;
+    }
+    modeLabel.textContent = multiSelectedIds.size > 0 ? `محدد ${multiSelectedIds.size} عقدة` : 'جاهز';
+  }
+  window.addEventListener('keydown', (e)=>{
+    if(e.code === 'Space' && !spaceHeld){
+      const activeTag = document.activeElement && document.activeElement.tagName;
+      if(activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+      spaceHeld = true;
+      stage.style.cursor = 'grab';
+    }
+  });
+  window.addEventListener('keyup', (e)=>{
+    if(e.code === 'Space'){ spaceHeld = false; stage.style.cursor = ''; }
+  });
 
   function setZoom(newScale, clientX, clientY){
     newScale = Math.min(2, Math.max(0.4, newScale));
@@ -2035,7 +2272,7 @@
     const rect = stage.getBoundingClientRect();
     const p = stagePoint(rect.width/2 + (Math.random()*120-60), rect.height/2 + (Math.random()*120-60));
     const dflt = isMilestoneMode ? milestoneNodeDefaults : nodeDefaults;
-    createNode(snap(p.x), snap(p.y), text, isMilestoneMode, undefined, undefined, { ...dflt });
+    createNode(snap(p.x), snap(p.y), text, isMilestoneMode, dflt.w, dflt.h, { ...dflt });
     nodeInput.value = '';
     nodeInput.focus();
     commitHistory();
@@ -2062,6 +2299,13 @@
     }
     if((e.key==='Delete' || e.key==='Backspace') && !typing){
       deleteSelected();
+    }
+    if(mod && !typing && (e.key === 'c' || e.key === 'C')){
+      if(copySelectionToClipboard()) rbToast('اتنسخت.', 'success');
+    }
+    if(mod && !typing && (e.key === 'v' || e.key === 'V')){
+      e.preventDefault();
+      pasteClipboard();
     }
   });
   undoBtn.addEventListener('click', undo);
@@ -2612,6 +2856,97 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   window.RoadmapUI = { toast: rbToast, confirm: rbConfirm, showLink: rbShowLink };
+
+  // ================= قائمة العقد الجانبية (زي List View في ووردبريس جوتنبرج) =================
+  const nodesListBtn = document.getElementById('nodesListBtn');
+  const closeNodesListBtn = document.getElementById('closeNodesListBtn');
+  const nodesListBackdrop = document.getElementById('nodesListBackdrop');
+  const nodesListBody = document.getElementById('nodesListBody');
+
+  function focusOnNode(id){
+    const n = nodes[id];
+    if(!n) return;
+    const rect = stage.getBoundingClientRect();
+    panX = rect.width/2 - (n.x + n.w/2) * scale;
+    panY = rect.height/2 - (n.y + n.h/2) * scale;
+    applyTransform();
+  }
+
+  function buildNodesListPanel(){
+    nodesListBody.innerHTML = '';
+    const ordered = Object.keys(nodes).sort((a,b)=>
+      (parseInt(nodes[b].el.style.zIndex,10)||0) - (parseInt(nodes[a].el.style.zIndex,10)||0)
+    );
+    if(ordered.length === 0){
+      nodesListBody.innerHTML = '<p class="account-hint" style="padding:6px 2px;">مفيش عقد في المخطط لسه.</p>';
+      return;
+    }
+    ordered.forEach(id=>{
+      const n = nodes[id];
+      const row = document.createElement('div');
+      row.className = 'nodes-list-row';
+      row.draggable = true;
+      row.dataset.id = id;
+      row.innerHTML = `
+        <span class="nl-handle">⋮⋮</span>
+        <span class="nl-dot"></span>
+        <span class="nl-text"></span>
+        <button type="button" class="nl-del" title="حذف">✕</button>
+      `;
+      row.querySelector('.nl-dot').style.background = n.milestone ? '#e8542a' : '#9aa1b0';
+      row.querySelector('.nl-text').textContent = n.text || '(بدون نص)';
+      row.addEventListener('click', (e)=>{
+        if(e.target.closest('.nl-del')) return;
+        selectNode(id);
+        focusOnNode(id);
+      });
+      row.querySelector('.nl-del').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        selectNode(id);
+        deleteSelected();
+        buildNodesListPanel();
+      });
+      row.addEventListener('dragstart', ()=>{ row.classList.add('dragging'); });
+      row.addEventListener('dragend', ()=>{ row.classList.remove('dragging'); });
+      row.addEventListener('dragover', (e)=>{
+        e.preventDefault();
+        const draggingRow = nodesListBody.querySelector('.dragging');
+        if(!draggingRow || draggingRow === row) return;
+        const rect = row.getBoundingClientRect();
+        const before = (e.clientY - rect.top) < rect.height/2;
+        nodesListBody.insertBefore(draggingRow, before ? row : row.nextSibling);
+      });
+      nodesListBody.appendChild(row);
+    });
+  }
+  nodesListBody.addEventListener('drop', (e)=>{
+    e.preventDefault();
+    const rows = [...nodesListBody.querySelectorAll('.nodes-list-row')];
+    if(rows.length === 0) return;
+    const total = rows.length;
+    rows.forEach((row, idx)=>{
+      const id = row.dataset.id;
+      if(nodes[id]) nodes[id].el.style.zIndex = total - idx;
+    });
+    zTop = total + 1;
+    commitHistory();
+  });
+
+  function openNodesListPanel(){
+    document.body.classList.remove('account-drawer-open');
+    const accDrawerBackdrop = document.getElementById('accountDrawerBackdrop');
+    if(accDrawerBackdrop) accDrawerBackdrop.classList.add('hidden');
+    buildNodesListPanel();
+    document.body.classList.add('nodes-list-open');
+    nodesListBackdrop.classList.remove('hidden');
+  }
+  function closeNodesListPanel(){
+    document.body.classList.remove('nodes-list-open');
+    nodesListBackdrop.classList.add('hidden');
+  }
+  nodesListBtn.addEventListener('click', openNodesListPanel);
+  closeNodesListBtn.addEventListener('click', closeNodesListPanel);
+  nodesListBackdrop.addEventListener('click', closeNodesListPanel);
 
   window.RoadmapBuilder = {
     getState: function(){ return snapshotState(); },
