@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>باني المخططات — Roadmap Builder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg: #f4f5f7;
+    --grid-line: #dfe2e8;
+    --grid-line-strong: #cdd1da;
+    --panel: #ffffff;
+    --panel-border: #e3e5ea;
+    --line: #9aa1b0;
+    --accent: #e8542a;
+    --accent-dim: #e8542a22;
+    --mint: #0f9d72;
+    --mint-dim: #0f9d7220;
+    --text: #1b1f27;
+    --text-dim: #6b7280;
+    --node-bg: #ffffff;
+    --node-border: #d7dae1;
+    --font-display: 'IBM Plex Sans Arabic', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-display);
+    overflow:hidden;
+  }
+
+  #canvas-wrap{ position:fixed; inset:0; background:var(--bg); }
+
+  #stage{ position:absolute; inset:0; cursor:grab; }
+  #stage.panning{ cursor:grabbing; }
+
+  #world{
+    position:absolute; top:0; left:0;
+    transform-origin: 0 0;
+  }
+
+  /* الشبكة البيانية */
+  #grid{
+    position:absolute;
+    top:-6000px; left:-6000px;
+    width:12000px; height:12000px;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(var(--grid-line-strong) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line-strong) 1px, transparent 1px);
+    background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+    pointer-events:none;
+  }
+
+  svg#lines{
+    position:absolute; top:-6000px; left:-6000px;
+    width:12000px; height:12000px;
+    pointer-events:none; overflow:visible;
+  }
+
+  .edge{ fill:none; stroke:var(--line); stroke-width:2.5; transition: stroke .15s, stroke-width .15s; }
+  .edge.milestone{ stroke: var(--accent); }
+  .edge-group:hover .edge{ stroke:var(--mint); }
+  .edge-hit{ fill:none; stroke:transparent; stroke-width:22; pointer-events:stroke; cursor:grab; }
+  .edge-hit:active{ cursor:grabbing; }
+  .edge-handle{
+    fill:#fff; stroke:var(--mint); stroke-width:2;
+    pointer-events:all; cursor:grab;
+    opacity:0; transition: opacity .12s;
+  }
+  .edge-handle:active{ cursor:grabbing; }
+  .edge-group:hover .edge-handle, .edge-group.selected .edge-handle{ opacity:1; }
+
+  .node{
+    position:absolute;
+    background:var(--node-bg);
+    border:1.5px solid var(--node-border);
+    border-radius:10px;
+    box-shadow: 0 1px 3px #1b1f2712, 0 1px 2px #1b1f2712;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .node.milestone{ border-color: var(--accent); border-width:2px; }
+  .node.milestone::before{
+    content:""; position:absolute; top:-6px; right:-6px;
+    width:10px; height:10px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 0 3px var(--bg);
+  }
+  .node.selected{
+    box-shadow: 0 0 0 3px var(--mint-dim), 0 4px 14px #1b1f2720;
+  }
+  .node.hover-eff-lift:hover{ transform:translateY(-3px); border-color:var(--hover-c, var(--node-border)); box-shadow:0 8px 20px var(--hover-c-dim, #0f9d7233), 0 2px 6px #1b1f2714; }
+  .node.hover-eff-glow:hover{ border-color:var(--hover-c, var(--node-border)); box-shadow:0 0 0 5px var(--hover-c-dim, #0f9d7233), 0 4px 14px #1b1f2718; }
+  .node.hover-eff-pulse:hover{ border-color:var(--hover-c, var(--node-border)); animation: nodePulse 1.3s ease-in-out infinite; }
+  @keyframes nodePulse{
+    0%,100%{ box-shadow:0 0 0 0 var(--hover-c-dim, #0f9d7233); }
+    50%{ box-shadow:0 0 0 8px transparent; }
+  }
+  .node[data-has-link="1"] .node-text{ cursor:pointer; }
+
+  .node-text{
+    position:absolute; inset:0;
+    padding:10px 14px;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center;
+    font-size:14px; font-weight:600; line-height:1.5;
+    color:var(--text);
+    overflow:auto;
+    white-space:pre-wrap;
+    word-break:break-word;
+    cursor:grab;
+  }
+  .node-text:active{ cursor:grabbing; }
+  .node-edit{
+    position:absolute; inset:0;
+    padding:10px 14px;
+    font-family:var(--font-display);
+    font-size:14px; font-weight:600; line-height:1.5;
+    color:var(--text);
+    text-align:center;
+    background:#fffdf7;
+    border:none; outline:2px solid var(--mint);
+    border-radius:9px;
+    resize:none;
+  }
+
+  .badge{
+    position:absolute; bottom:6px; left:14px;
+    font-family:var(--font-mono); font-size:9.5px; font-weight:400;
+    color:var(--text-dim); pointer-events:none;
+  }
+
+  /* منافذ الربط: لا تُصدَّر أبداً لأنها غير موجودة في نموذج البيانات المُصدَّر */
+  .port{
+    position:absolute; width:14px; height:14px; border-radius:50%;
+    background:#fff; border:2px solid var(--text-dim);
+    cursor:crosshair; z-index:6;
+    transition: transform .12s, border-color .12s, background .12s;
+  }
+  .port:hover{ transform:scale(1.35); border-color:var(--mint); background:var(--mint-dim); }
+  .port.top{ top:-8px; left:50%; transform:translateX(-50%); }
+  .port.bottom{ bottom:-8px; left:50%; transform:translateX(-50%); }
+  .port.left{ left:-8px; top:50%; transform:translateY(-50%); }
+  .port.right{ right:-8px; top:50%; transform:translateY(-50%); }
+
+  .resize-handle{
+    position:absolute;
+    background:#fff; border:2px solid var(--text-dim);
+    z-index:6;
+    opacity:0; transition: opacity .12s, border-color .12s;
+  }
+  .node:hover .resize-handle, .node.selected .resize-handle{ opacity:1; }
+  .resize-handle:hover{ border-color:var(--mint); }
+
+  .resize-handle.rh-ne, .resize-handle.rh-nw, .resize-handle.rh-se, .resize-handle.rh-sw{
+    width:12px; height:12px; border-radius:4px;
+  }
+  .resize-handle.rh-ne{ top:-7px; right:-7px; cursor:nesw-resize; }
+  .resize-handle.rh-nw{ top:-7px; left:-7px; cursor:nwse-resize; }
+  .resize-handle.rh-se{ bottom:-7px; right:-7px; cursor:nwse-resize; }
+  .resize-handle.rh-sw{ bottom:-7px; left:-7px; cursor:nesw-resize; }
+
+  /* شريط الأدوات */
+  #toolbar{
+    position:fixed; top:20px; right:20px; z-index:20;
+    display:flex; flex-direction:column; gap:10px;
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:14px; padding:16px; width:260px;
+    box-shadow: 0 12px 28px #1b1f2718;
+    max-height:calc(100vh - 40px); overflow-y:auto;
+  }
+  #toolbar h1{ font-size:15px; margin:0 0 2px; display:flex; align-items:center; gap:8px; }
+  #toolbar h1 .dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); }
+  #toolbar h2{ font-size:11.5px; margin:8px 0 0; color:var(--text-dim); font-weight:600; letter-spacing:.02em; }
+  #toolbar p.hint{ margin:0 0 6px; font-size:11.5px; color:var(--text-dim); line-height:1.7; }
+  .row{ display:flex; gap:8px; }
+  input[type=text], input[type=number]{
+    flex:1; width:100%; background:#fbfbfc; border:1px solid var(--node-border);
+    color:var(--text); border-radius:8px; padding:9px 10px;
+    font-family:var(--font-display); font-size:13px; outline:none;
+  }
+  input[type=number]{ font-family:var(--font-mono); }
+  select{
+    flex:1; width:100%; background:#fbfbfc; border:1px solid var(--node-border);
+    color:var(--text); border-radius:8px; padding:9px 10px;
+    font-family:var(--font-display); font-size:13px; outline:none; cursor:pointer;
+  }
+  select:focus, input:focus{ border-color:var(--mint); background:#fff; }
+  button{
+    font-family:var(--font-display); font-weight:600; font-size:13px;
+    border:none; border-radius:8px; padding:9px 12px; cursor:pointer;
+    transition: filter .1s, transform .05s, background .1s;
+  }
+  button:active{ transform: scale(.96); }
+  .btn-primary{ background:var(--mint); color:#fff; }
+  .btn-primary:hover{ filter:brightness(1.08); }
+  .btn-accent{ background:var(--accent); color:#fff; }
+  .btn-accent:hover{ filter:brightness(1.08); }
+  .btn-ghost{ background:#fff; color:var(--text-dim); border:1px solid var(--node-border); }
+  .btn-ghost:hover{ color:var(--text); border-color:var(--text-dim); }
+  .btn-danger{ background:#fff; color:#c8402a; border:1px solid #c8402a44; }
+  .btn-danger:hover{ background:#c8402a10; }
+
+  .field-label{ font-size:11px; color:var(--text-dim); margin-bottom:-3px; }
+
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12.5px; color:var(--text-dim);
+    padding-top:8px; margin-top:2px; border-top:1px dashed var(--panel-border);
+  }
+  .switch{ width:34px; height:19px; border-radius:20px; background:var(--node-border); position:relative; cursor:pointer; flex-shrink:0; }
+  .switch::after{ content:""; position:absolute; top:2px; right:2px; width:15px; height:15px; border-radius:50%; background:#fff; box-shadow:0 1px 2px #0002; transition: right .15s, background .15s; }
+  .switch.on{ background:var(--mint-dim); }
+  .switch.on::after{ right:17px; background:var(--mint); }
+
+  hr.sep{ border:none; border-top:1px dashed var(--panel-border); margin:4px 0; }
+
+  .swatch-row{ display:flex; flex-wrap:wrap; gap:7px; margin:3px 0 2px; }
+  .swatch{
+    width:22px; height:22px; border-radius:50%; padding:0;
+    border:2px solid #fff; box-shadow:0 0 0 1px var(--node-border);
+    cursor:pointer; transition: transform .15s, box-shadow .15s;
+  }
+  .swatch:hover{ transform:scale(1.15); }
+  .swatch.active{
+    box-shadow:0 0 0 2px var(--mint);
+    animation: swatchPop .22s ease;
+  }
+  @keyframes swatchPop{
+    0%{ transform:scale(.65); }
+    60%{ transform:scale(1.25); }
+    100%{ transform:scale(1.08); }
+  }
+  input.swatch-custom{
+    width:22px; height:22px; border-radius:50%; padding:0;
+    border:2px dashed var(--text-dim); background:#fff; cursor:pointer;
+  }
+  input.swatch-custom::-webkit-color-swatch-wrapper{ padding:2px; }
+  input.swatch-custom::-webkit-color-swatch{ border:none; border-radius:50%; }
+
+  #status{
+    position:fixed; bottom:18px; right:20px; z-index:20;
+    font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+    background:var(--panel); border:1px solid var(--panel-border);
+    padding:8px 12px; border-radius:8px; display:flex; gap:14px;
+    box-shadow: 0 4px 14px #1b1f2712;
+  }
+  #status b{ color:var(--text); font-weight:600; }
+
+  #zoom-ctl{
+    position:fixed; bottom:18px; left:20px; z-index:20; display:flex; gap:6px;
+    background:var(--panel); border:1px solid var(--panel-border); padding:6px; border-radius:10px;
+    box-shadow: 0 4px 14px #1b1f2712;
+  }
+  #zoom-ctl button{ width:30px; height:30px; padding:0; background:transparent; color:var(--text-dim); font-size:16px; }
+  #zoom-ctl button:hover{ color:var(--text); background:#00000008; }
+
+  ::selection{ background:var(--mint-dim); }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <div id="stage">
+    <div id="world">
+      <div id="grid"></div>
+      <svg id="lines"><g id="lines-g" transform="translate(6000,6000)"></g></svg>
+    </div>
+  </div>
+</div>
+
+<div id="toolbar">
+  <h1><span class="dot"></span> باني الخريطة</h1>
+  <p class="hint">اكتب عنوان الخطوة وأضِفها، بعدين انقر نقرتين على العقدة عشان تحرر النص بحرية. اسحب من مقابض الزوايا الأربعة لتغيير العرض/الطول، ومن نقط منتصف الأضلاع الأربعة لربط عقد ببعض. حدد عقدة عشان تظبط لونها ورابطها من لوحة الإعدادات تحت.</p>
+  <div class="row">
+    <input type="text" id="nodeInput" placeholder="مثلاً: تعلّم المصفوفات...">
+  </div>
+  <div class="row">
+    <button class="btn-primary" id="addBtn" style="flex:1">+ إضافة عقدة</button>
+  </div>
+  <div class="toggle-row">
+    عقدة أساسية (Milestone)
+    <div class="switch" id="milestoneSwitch"></div>
+  </div>
+  <div class="toggle-row">
+    الالتزام بالشبكة (Snap)
+    <div class="switch on" id="snapSwitch"></div>
+  </div>
+
+  <div id="propsPanel" style="display:none">
+    <hr class="sep">
+    <h2>خصائص العقدة المحددة</h2>
+    <div class="row">
+      <div style="flex:1">
+        <div class="field-label">العرض (px)</div>
+        <input type="number" id="wInput" min="60" step="4">
+      </div>
+      <div style="flex:1">
+        <div class="field-label">الطول (px)</div>
+        <input type="number" id="hInput" min="34" step="4">
+      </div>
+    </div>
+
+    <div class="field-label" style="margin-top:6px">رابط العقدة (اختياري) — يفتح عند الضغط على العقدة</div>
+    <div class="row">
+      <input type="text" id="linkInput" placeholder="https://...">
+    </div>
+
+    <h2 style="margin-top:10px">المظهر</h2>
+    <div class="field-label">لون الخلفية</div>
+    <div class="swatch-row" id="bgSwatches"></div>
+
+    <div class="field-label">لون النص</div>
+    <div class="swatch-row" id="textSwatches"></div>
+
+    <div class="field-label">لون الإطار</div>
+    <div class="swatch-row" id="borderSwatches"></div>
+
+    <div class="field-label">لون تأثير المرور (Hover)</div>
+    <div class="swatch-row" id="hoverSwatches"></div>
+
+    <div class="field-label" style="margin-top:2px">نوع أنيميشن المرور</div>
+    <div class="row">
+      <select id="hoverEffectSelect">
+        <option value="none">بدون تأثير</option>
+        <option value="lift">رفع خفيف</option>
+        <option value="glow">توهج ناعم</option>
+        <option value="pulse">نبض</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:2px">
+    <button class="btn-ghost" id="clearSelBtn" style="flex:1">إلغاء التحديد</button>
+    <button class="btn-danger" id="deleteBtn" style="flex:1">حذف المحدد</button>
+  </div>
+
+  <hr class="sep">
+  <button class="btn-accent" id="exportBtn">⬇ تصدير الخريطة (HTML+CSS+JS)</button>
+</div>
+
+<div id="status">
+  <span>عُقد: <b id="cNodes">0</b></span>
+  <span>روابط: <b id="cEdges">0</b></span>
+  <span id="modeLabel">جاهز</span>
+</div>
+
+<div id="zoom-ctl">
+  <button id="zoomOut">−</button>
+  <button id="zoomReset" style="font-size:11px;">100%</button>
+  <button id="zoomIn">+</button>
+</div>
+
+<script>
+(function(){
+  const world = document.getElementById('world');
+  const stage = document.getElementById('stage');
+  const linesG = document.getElementById('lines-g');
+  const nodeInput = document.getElementById('nodeInput');
+  const addBtn = document.getElementById('addBtn');
+  const deleteBtn = document.getElementById('deleteBtn');
+  const clearSelBtn = document.getElementById('clearSelBtn');
+  const milestoneSwitch = document.getElementById('milestoneSwitch');
+  const snapSwitch = document.getElementById('snapSwitch');
+  const cNodesEl = document.getElementById('cNodes');
+  const cEdgesEl = document.getElementById('cEdges');
+  const modeLabel = document.getElementById('modeLabel');
+  const zoomOutBtn = document.getElementById('zoomOut');
+  const zoomInBtn = document.getElementById('zoomIn');
+  const zoomResetBtn = document.getElementById('zoomReset');
+  const propsPanel = document.getElementById('propsPanel');
+  const wInput = document.getElementById('wInput');
+  const hInput = document.getElementById('hInput');
+  const linkInput = document.getElementById('linkInput');
+  const hoverEffectSelect = document.getElementById('hoverEffectSelect');
+  const exportBtn = document.getElementById('exportBtn');
+
+  const PALETTES = {
+    bg: ['#ffffff','#fff8ee','#eafbf4','#ffece3','#eaf3ff','#f3edff','#1b1f27'],
+    color: ['#1b1f27','#3c4353','#0f9d72','#e8542a','#1d3a8f','#6b7280','#ffffff'],
+    border: ['#d7dae1','#0f9d72','#e8542a','#1d3a8f','#d1477a','#9aa1b0'],
+    hoverColor: ['#0f9d72','#e8542a','#2f6fed','#d1477a','#7c5cff','#d99a1b']
+  };
+  const SWATCH_ROWS = [
+    { id:'bgSwatches', key:'bg' },
+    { id:'textSwatches', key:'color' },
+    { id:'borderSwatches', key:'border' },
+    { id:'hoverSwatches', key:'hoverColor' }
+  ];
+
+  const GRID = 24;
+  const DEFAULT_W = 180, DEFAULT_H = 64, MIN_W = 60, MIN_H = 34;
+
+  let nodes = {};   // id -> {el, textEl, x, y, w, h, milestone, text, z}
+  let edges = [];    // {id, from, to, pathEl, hitEl}
+  let nodeSeq = 1, edgeSeq = 1, zTop = 1;
+  let selectedNode = null;
+  let selectedEdge = null;
+  let isMilestoneMode = false;
+  let snapEnabled = true;
+
+  let scale = 1, panX = 60, panY = 60;
+  applyTransform();
+
+  function applyTransform(){
+    world.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+  }
+  function snap(v){ return snapEnabled ? Math.round(v / GRID) * GRID : v; }
+
+  function hexToRgba(hex, alpha){
+    hex = String(hex || '#0f9d72').replace('#','');
+    if(hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
+    const r = parseInt(hex.substr(0,2),16) || 0;
+    const g = parseInt(hex.substr(2,2),16) || 0;
+    const b = parseInt(hex.substr(4,2),16) || 0;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function applyNodeStyle(id){
+    const node = nodes[id];
+    if(!node) return;
+    node.el.style.background = node.bg;
+    node.el.style.borderColor = node.border;
+    node.textEl.style.color = node.color;
+    node.el.style.setProperty('--hover-c', node.hoverColor);
+    node.el.style.setProperty('--hover-c-dim', hexToRgba(node.hoverColor, .35));
+    node.el.classList.remove('hover-eff-none','hover-eff-lift','hover-eff-glow','hover-eff-pulse');
+    node.el.classList.add('hover-eff-' + (node.hoverEffect || 'lift'));
+    node.el.dataset.hasLink = node.link ? '1' : '0';
+  }
+
+  function buildSwatchRow(containerEl, key){
+    containerEl.innerHTML = '';
+    PALETTES[key].forEach(color=>{
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch';
+      b.style.background = color;
+      b.dataset.color = color;
+      b.title = color;
+      b.addEventListener('click', ()=> applyColorChoice(key, color));
+      containerEl.appendChild(b);
+    });
+    const custom = document.createElement('input');
+    custom.type = 'color';
+    custom.className = 'swatch swatch-custom';
+    custom.title = 'لون مخصص';
+    custom.addEventListener('input', ()=> applyColorChoice(key, custom.value));
+    containerEl.appendChild(custom);
+    containerEl._customInput = custom;
+  }
+  SWATCH_ROWS.forEach(row=> buildSwatchRow(document.getElementById(row.id), row.key));
+
+  function applyColorChoice(key, color){
+    if(!selectedNode) return;
+    nodes[selectedNode][key] = color;
+    applyNodeStyle(selectedNode);
+    refreshSwatchSelection();
+  }
+
+  function refreshSwatchSelection(){
+    if(!selectedNode) return;
+    const node = nodes[selectedNode];
+    SWATCH_ROWS.forEach(row=>{
+      const container = document.getElementById(row.id);
+      container.querySelectorAll('.swatch').forEach(sw=>{
+        sw.classList.toggle('active', sw.dataset.color === node[row.key]);
+      });
+      if(container._customInput && /^#/.test(node[row.key])) container._customInput.value = node[row.key];
+    });
+    hoverEffectSelect.value = node.hoverEffect || 'lift';
+  }
+
+  // ---------- إنشاء عقدة ----------
+  function createNode(x, y, text, milestone, w, h, opts){
+    opts = opts || {};
+    const id = 'n' + (nodeSeq++);
+    w = w || DEFAULT_W; h = h || DEFAULT_H;
+    const el = document.createElement('div');
+    el.className = 'node' + (milestone ? ' milestone' : '');
+    el.dataset.id = id;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.width = w + 'px';
+    el.style.height = h + 'px';
+    el.style.zIndex = zTop++;
+
+    const textEl = document.createElement('div');
+    textEl.className = 'node-text';
+    textEl.textContent = text;
+    el.appendChild(textEl);
+
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.textContent = milestone ? 'أساسية' : 'اختيارية';
+    el.appendChild(badge);
+
+    ['top','bottom','left','right'].forEach(side=>{
+      const p = document.createElement('div');
+      p.className = 'port ' + side;
+      p.addEventListener('pointerdown', (e)=> startEdgeDrag(e, id, side));
+      el.appendChild(p);
+    });
+
+    ['ne','nw','se','sw'].forEach(dir=>{
+      const h2 = document.createElement('div');
+      h2.className = 'resize-handle rh-' + dir;
+      h2.addEventListener('pointerdown', (e)=> startResize(e, id, dir));
+      el.appendChild(h2);
+    });
+
+    world.appendChild(el);
+    nodes[id] = {
+      el, textEl, x, y, w, h, milestone, text,
+      bg: opts.bg || '#ffffff',
+      color: opts.color || '#1b1f27',
+      border: opts.border || (milestone ? '#e8542a' : '#d7dae1'),
+      hoverColor: opts.hoverColor || '#0f9d72',
+      hoverEffect: opts.hoverEffect || 'lift',
+      link: opts.link || '',
+      _clickTimer: null
+    };
+    applyNodeStyle(id);
+
+    textEl.addEventListener('pointerdown', (e)=> startNodeDrag(e, id));
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); selectNode(id); });
+    textEl.addEventListener('dblclick', (e)=>{ e.stopPropagation(); enterEditMode(id); });
+
+    updateCounts();
+    return id;
+  }
+
+  function bringToFront(id){
+    nodes[id].el.style.zIndex = zTop++;
+  }
+
+  // ---------- تحرير النص بحرية ----------
+  function enterEditMode(id){
+    const node = nodes[id];
+    clearTimeout(node._clickTimer);
+    const ta = document.createElement('textarea');
+    ta.className = 'node-edit';
+    ta.value = node.text;
+    node.el.appendChild(ta);
+    node.textEl.style.display = 'none';
+    ta.focus();
+    ta.select();
+    function finish(){
+      node.text = ta.value.trim() || node.text;
+      node.textEl.textContent = node.text;
+      node.textEl.style.display = '';
+      ta.remove();
+    }
+    ta.addEventListener('blur', finish);
+    ta.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape'){ ta.value = node.text; finish(); }
+      e.stopPropagation();
+    });
+  }
+
+  // ---------- سحب العقد (ضغطة بدون تحريك تفتح رابط العقدة لو موجود) ----------
+  let dragState = null;
+  function startNodeDrag(e, id){
+    e.stopPropagation();
+    const node = nodes[id];
+    bringToFront(id);
+    selectNode(id);
+    dragState = { id, moved:false, startClientX: e.clientX, startClientY: e.clientY, startX: node.x, startY: node.y };
+    window.addEventListener('pointermove', onNodeDrag);
+    window.addEventListener('pointerup', endNodeDrag);
+  }
+  function onNodeDrag(e){
+    if(!dragState) return;
+    if(Math.abs(e.clientX - dragState.startClientX) > 3 || Math.abs(e.clientY - dragState.startClientY) > 3){
+      dragState.moved = true;
+    }
+    const dx = (e.clientX - dragState.startClientX) / scale;
+    const dy = (e.clientY - dragState.startClientY) / scale;
+    const node = nodes[dragState.id];
+    node.x = snap(dragState.startX + dx);
+    node.y = snap(dragState.startY + dy);
+    node.el.style.left = node.x + 'px';
+    node.el.style.top = node.y + 'px';
+    updateEdgesFor(dragState.id);
+  }
+  function endNodeDrag(){
+    if(dragState && !dragState.moved){
+      const node = nodes[dragState.id];
+      if(node && node.link){
+        clearTimeout(node._clickTimer);
+        node._clickTimer = setTimeout(()=>{ window.open(node.link, '_blank', 'noopener'); }, 220);
+      }
+    }
+    dragState = null;
+    window.removeEventListener('pointermove', onNodeDrag);
+    window.removeEventListener('pointerup', endNodeDrag);
+  }
+
+  // ---------- تغيير الحجم من أي حافة أو زاوية ----------
+  let resizeState = null;
+  function startResize(e, id, dir){
+    e.stopPropagation(); e.preventDefault();
+    const node = nodes[id];
+    bringToFront(id); selectNode(id);
+    resizeState = { id, dir, startClientX: e.clientX, startClientY: e.clientY, startX: node.x, startY: node.y, startW: node.w, startH: node.h };
+    window.addEventListener('pointermove', onResize);
+    window.addEventListener('pointerup', endResize);
+  }
+  function onResize(e){
+    if(!resizeState) return;
+    const dx = (e.clientX - resizeState.startClientX) / scale;
+    const dy = (e.clientY - resizeState.startClientY) / scale;
+    const node = nodes[resizeState.id];
+    const dir = resizeState.dir;
+    let newW = resizeState.startW, newH = resizeState.startH;
+    let newX = resizeState.startX, newY = resizeState.startY;
+
+    if(dir.indexOf('e') !== -1) newW = resizeState.startW + dx;
+    if(dir.indexOf('w') !== -1){ newW = resizeState.startW - dx; newX = resizeState.startX + dx; }
+    if(dir.indexOf('s') !== -1) newH = resizeState.startH + dy;
+    if(dir.indexOf('n') !== -1){ newH = resizeState.startH - dy; newY = resizeState.startY + dy; }
+
+    node.w = Math.max(MIN_W, snap(newW));
+    node.h = Math.max(MIN_H, snap(newH));
+    node.x = snap(newX);
+    node.y = snap(newY);
+    node.el.style.width = node.w + 'px';
+    node.el.style.height = node.h + 'px';
+    node.el.style.left = node.x + 'px';
+    node.el.style.top = node.y + 'px';
+    if(selectedNode === resizeState.id){ wInput.value = node.w; hInput.value = node.h; }
+    updateEdgesFor(resizeState.id);
+  }
+  function endResize(){
+    resizeState = null;
+    window.removeEventListener('pointermove', onResize);
+    window.removeEventListener('pointerup', endResize);
+  }
+
+  // ---------- سحب الروابط من النقاط (يدعم عدة روابط لنفس العقدة) ----------
+  let edgeDrag = null;
+  let tempPath = null;
+  function startEdgeDrag(e, fromId, side){
+    e.stopPropagation(); e.preventDefault();
+    modeLabel.textContent = 'اسحب للعقدة الهدف';
+    tempPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+    tempPath.setAttribute('class','edge');
+    tempPath.setAttribute('stroke-dasharray','5,5');
+    linesG.appendChild(tempPath);
+    edgeDrag = { fromId, side };
+    window.addEventListener('pointermove', onEdgeDragMove);
+    window.addEventListener('pointerup', onEdgeDragEnd);
+  }
+  function stagePoint(clientX, clientY){
+    const rect = stage.getBoundingClientRect();
+    return { x: (clientX - rect.left - panX) / scale, y: (clientY - rect.top - panY) / scale };
+  }
+  function onEdgeDragMove(e){
+    if(!edgeDrag) return;
+    const from = anchorPoint(nodes[edgeDrag.fromId], edgeDrag.side);
+    const p = stagePoint(e.clientX, e.clientY);
+    tempPath.setAttribute('d', previewBezier(from.x, from.y, p.x, p.y));
+    document.querySelectorAll('.node').forEach(n=>n.style.boxShadow='');
+    const hovered = document.elementFromPoint(e.clientX, e.clientY);
+    const nodeEl = hovered && hovered.closest ? hovered.closest('.node') : null;
+    if(nodeEl && nodeEl.dataset.id !== edgeDrag.fromId){
+      nodeEl.style.boxShadow = '0 0 0 3px var(--mint-dim)';
+    }
+  }
+  function onEdgeDragEnd(e){
+    window.removeEventListener('pointermove', onEdgeDragMove);
+    window.removeEventListener('pointerup', onEdgeDragEnd);
+    if(tempPath){ tempPath.remove(); tempPath = null; }
+    document.querySelectorAll('.node').forEach(n=>n.style.boxShadow='');
+    const hovered = document.elementFromPoint(e.clientX, e.clientY);
+    const nodeEl = hovered && hovered.closest ? hovered.closest('.node') : null;
+    if(nodeEl && edgeDrag && nodeEl.dataset.id !== edgeDrag.fromId){
+      createEdge(edgeDrag.fromId, nodeEl.dataset.id);
+    }
+    edgeDrag = null;
+    modeLabel.textContent = 'جاهز';
+  }
+
+  function anchorPoint(node, side){
+    switch(side){
+      case 'top': return { x: node.x + node.w/2, y: node.y };
+      case 'bottom': return { x: node.x + node.w/2, y: node.y + node.h };
+      case 'left': return { x: node.x, y: node.y + node.h/2 };
+      case 'right': return { x: node.x + node.w, y: node.y + node.h/2 };
+    }
+  }
+  function centerPoint(node){ return { x: node.x + node.w/2, y: node.y + node.h/2 }; }
+  // معاينة مؤقتة أثناء سحب رابط جديد من نقطة الاتصال
+  function previewBezier(x1,y1,x2,y2){
+    const dx = Math.abs(x2-x1) * 0.5 + 30;
+    const s = Math.sign(x2-x1) || 1;
+    return `M ${x1} ${y1} C ${x1+dx*s} ${y1}, ${x2-dx*s} ${y2}, ${x2} ${y2}`;
+  }
+  // منحنى الرابط الفعلي: نقطة تحكم واحدة قابلة للسحب (bendOffset نسبةً لمنتصف الخط)
+  function edgeGeometry(a, b, bendOffset){
+    const mid = { x: (a.x+b.x)/2, y: (a.y+b.y)/2 };
+    const ctrl = { x: mid.x + (bendOffset ? bendOffset.dx : 0), y: mid.y + (bendOffset ? bendOffset.dy : 0) };
+    return { d: `M ${a.x} ${a.y} Q ${ctrl.x} ${ctrl.y} ${b.x} ${b.y}`, ctrl };
+  }
+
+  // لا يوجد حد أقصى لعدد الروابط الخارجة من نفس العقدة — فقط يمنع تكرار نفس الزوج
+  function createEdge(fromId, toId){
+    const exists = edges.find(ed => (ed.from===fromId && ed.to===toId) || (ed.from===toId && ed.to===fromId));
+    if(exists) return;
+    const id = 'e' + (edgeSeq++);
+    const milestone = nodes[fromId].milestone && nodes[toId].milestone;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const group = document.createElementNS(svgNS,'g');
+    group.setAttribute('class','edge-group');
+    const path = document.createElementNS(svgNS,'path');
+    path.setAttribute('class','edge' + (milestone ? ' milestone' : ''));
+    const hit = document.createElementNS(svgNS,'path');
+    hit.setAttribute('class','edge-hit');
+    const handle = document.createElementNS(svgNS,'circle');
+    handle.setAttribute('class','edge-handle');
+    handle.setAttribute('r','7');
+    group.appendChild(path); group.appendChild(hit); group.appendChild(handle);
+    linesG.appendChild(group);
+
+    const edge = { id, from: fromId, to: toId, pathEl: path, hitEl: hit, handleEl: handle, groupEl: group, bendOffset: { dx:0, dy:0 } };
+    edges.push(edge);
+
+    hit.addEventListener('pointerdown', (e)=> startEdgeGrab(e, id, false));
+    handle.addEventListener('pointerdown', (e)=> startEdgeGrab(e, id, true));
+    hit.addEventListener('dblclick', (e)=>{ e.stopPropagation(); edge.bendOffset = { dx:0, dy:0 }; updateEdgePath(id); });
+
+    updateEdgePath(id);
+    updateCounts();
+  }
+
+  // سحب الخط نفسه (من أي نقطة عليه) أو من مقبضه الدائري لثنيه وفكّ أي تصادم بينه وبين خطوط تانية
+  let edgeBendState = null;
+  function startEdgeGrab(e, id, fromHandle){
+    e.stopPropagation(); e.preventDefault();
+    const edge = edges.find(x=>x.id===id);
+    edgeBendState = {
+      id, moved:false,
+      startClientX: e.clientX, startClientY: e.clientY,
+      startOffset: { ...edge.bendOffset }
+    };
+    window.addEventListener('pointermove', onEdgeBendMove);
+    window.addEventListener('pointerup', onEdgeBendUp);
+  }
+  function onEdgeBendMove(e){
+    if(!edgeBendState) return;
+    const dx = (e.clientX - edgeBendState.startClientX) / scale;
+    const dy = (e.clientY - edgeBendState.startClientY) / scale;
+    if(Math.abs(dx) > 3 || Math.abs(dy) > 3) edgeBendState.moved = true;
+    const edge = edges.find(x=>x.id===edgeBendState.id);
+    edge.bendOffset = { dx: edgeBendState.startOffset.dx + dx, dy: edgeBendState.startOffset.dy + dy };
+    updateEdgePath(edgeBendState.id);
+  }
+  function onEdgeBendUp(){
+    window.removeEventListener('pointermove', onEdgeBendMove);
+    window.removeEventListener('pointerup', onEdgeBendUp);
+    if(edgeBendState && !edgeBendState.moved) selectEdge(edgeBendState.id);
+    edgeBendState = null;
+  }
+
+  function updateEdgePath(id){
+    const edge = edges.find(e=>e.id===id);
+    if(!edge) return;
+    const a = centerPoint(nodes[edge.from]);
+    const b = centerPoint(nodes[edge.to]);
+    const geo = edgeGeometry(a, b, edge.bendOffset);
+    edge.pathEl.setAttribute('d', geo.d);
+    edge.hitEl.setAttribute('d', geo.d);
+    edge.handleEl.setAttribute('cx', geo.ctrl.x);
+    edge.handleEl.setAttribute('cy', geo.ctrl.y);
+  }
+  function updateEdgesFor(nodeId){
+    edges.forEach(e=>{ if(e.from===nodeId || e.to===nodeId) updateEdgePath(e.id); });
+  }
+
+  // ---------- التحديد والحذف ----------
+  function selectNode(id){
+    clearSelection();
+    selectedNode = id;
+    nodes[id].el.classList.add('selected');
+    propsPanel.style.display = '';
+    wInput.value = nodes[id].w;
+    hInput.value = nodes[id].h;
+    linkInput.value = nodes[id].link || '';
+    refreshSwatchSelection();
+  }
+  function selectEdge(id){
+    clearSelection();
+    selectedEdge = id;
+    const edge = edges.find(e=>e.id===id);
+    edge.pathEl.setAttribute('stroke', 'var(--mint)');
+    edge.pathEl.style.strokeWidth = '3.5';
+    edge.groupEl.classList.add('selected');
+  }
+  function clearSelection(){
+    if(selectedNode) nodes[selectedNode].el.classList.remove('selected');
+    if(selectedEdge){
+      const edge = edges.find(e=>e.id===selectedEdge);
+      if(edge){ edge.pathEl.removeAttribute('stroke'); edge.pathEl.style.strokeWidth=''; edge.groupEl.classList.remove('selected'); }
+    }
+    selectedNode = null; selectedEdge = null;
+    propsPanel.style.display = 'none';
+  }
+  function deleteSelected(){
+    if(selectedNode){
+      const id = selectedNode;
+      clearTimeout(nodes[id]._clickTimer);
+      edges = edges.filter(e=>{
+        if(e.from===id || e.to===id){ e.groupEl.remove(); return false; }
+        return true;
+      });
+      nodes[id].el.remove();
+      delete nodes[id];
+      selectedNode = null;
+      propsPanel.style.display = 'none';
+    } else if(selectedEdge){
+      const edge = edges.find(e=>e.id===selectedEdge);
+      if(edge){ edge.groupEl.remove(); }
+      edges = edges.filter(e=>e.id!==selectedEdge);
+      selectedEdge = null;
+    }
+    updateCounts();
+  }
+
+  function updateCounts(){
+    cNodesEl.textContent = Object.keys(nodes).length;
+    cEdgesEl.textContent = edges.length;
+  }
+
+  wInput.addEventListener('input', ()=>{
+    if(!selectedNode) return;
+    const node = nodes[selectedNode];
+    node.w = Math.max(MIN_W, parseInt(wInput.value)||DEFAULT_W);
+    node.el.style.width = node.w + 'px';
+    updateEdgesFor(selectedNode);
+  });
+  hInput.addEventListener('input', ()=>{
+    if(!selectedNode) return;
+    const node = nodes[selectedNode];
+    node.h = Math.max(MIN_H, parseInt(hInput.value)||DEFAULT_H);
+    node.el.style.height = node.h + 'px';
+    updateEdgesFor(selectedNode);
+  });
+  linkInput.addEventListener('input', ()=>{
+    if(!selectedNode) return;
+    nodes[selectedNode].link = linkInput.value.trim();
+    applyNodeStyle(selectedNode);
+  });
+  hoverEffectSelect.addEventListener('change', ()=>{
+    if(!selectedNode) return;
+    nodes[selectedNode].hoverEffect = hoverEffectSelect.value;
+    applyNodeStyle(selectedNode);
+  });
+
+  // ---------- تحريك اللوحة (Pan) والتكبير (Zoom) ----------
+  let panState = null;
+  stage.addEventListener('pointerdown', (e)=>{
+    if(e.target !== stage && e.target.id !== 'canvas-wrap' && e.target.id !== 'grid') return;
+    clearSelection();
+    panState = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
+    stage.classList.add('panning');
+    window.addEventListener('pointermove', onPan);
+    window.addEventListener('pointerup', endPan);
+  });
+  function onPan(e){
+    if(!panState) return;
+    panX = panState.startPanX + (e.clientX - panState.startX);
+    panY = panState.startPanY + (e.clientY - panState.startY);
+    applyTransform();
+  }
+  function endPan(){
+    panState = null;
+    stage.classList.remove('panning');
+    window.removeEventListener('pointermove', onPan);
+    window.removeEventListener('pointerup', endPan);
+  }
+
+  function setZoom(newScale, clientX, clientY){
+    newScale = Math.min(2, Math.max(0.4, newScale));
+    const rect = stage.getBoundingClientRect();
+    const cx = clientX !== undefined ? clientX - rect.left : rect.width/2;
+    const cy = clientY !== undefined ? clientY - rect.top : rect.height/2;
+    const worldX = (cx - panX) / scale;
+    const worldY = (cy - panY) / scale;
+    scale = newScale;
+    panX = cx - worldX * scale;
+    panY = cy - worldY * scale;
+    applyTransform();
+    zoomResetBtn.textContent = Math.round(scale*100) + '%';
+  }
+  stage.addEventListener('wheel', (e)=>{ e.preventDefault(); setZoom(scale * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY); }, { passive:false });
+  zoomInBtn.addEventListener('click', ()=> setZoom(scale*1.15));
+  zoomOutBtn.addEventListener('click', ()=> setZoom(scale*0.87));
+  zoomResetBtn.addEventListener('click', ()=> setZoom(1));
+
+  // ---------- شريط الأدوات ----------
+  milestoneSwitch.addEventListener('click', ()=>{
+    isMilestoneMode = !isMilestoneMode;
+    milestoneSwitch.classList.toggle('on', isMilestoneMode);
+  });
+  snapSwitch.addEventListener('click', ()=>{
+    snapEnabled = !snapEnabled;
+    snapSwitch.classList.toggle('on', snapEnabled);
+  });
+
+  function addFromInput(){
+    const text = nodeInput.value.trim();
+    if(!text) return;
+    const rect = stage.getBoundingClientRect();
+    const p = stagePoint(rect.width/2 + (Math.random()*120-60), rect.height/2 + (Math.random()*120-60));
+    createNode(snap(p.x), snap(p.y), text, isMilestoneMode);
+    nodeInput.value = '';
+    nodeInput.focus();
+  }
+  addBtn.addEventListener('click', addFromInput);
+  nodeInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') addFromInput(); });
+
+  deleteBtn.addEventListener('click', deleteSelected);
+  clearSelBtn.addEventListener('click', clearSelection);
+  window.addEventListener('keydown', (e)=>{
+    if((e.key==='Delete' || e.key==='Backspace') && document.activeElement !== nodeInput){
+      deleteSelected();
+    }
+  });
+
+  // ================= التصدير: 3 ملفات مستقلة =================
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+  function downloadFile(filename, content, mime){
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 4000);
+  }
+
+  function buildExport(){
+    const ids = Object.keys(nodes);
+    if(ids.length === 0) return null;
+    const PAD = 60;
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    ids.forEach(id=>{
+      const n = nodes[id];
+      minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h);
+    });
+    const offX = PAD - minX, offY = PAD - minY;
+    const W = Math.ceil(maxX - minX + PAD*2);
+    const H = Math.ceil(maxY - minY + PAD*2);
+
+    const nodeDivs = ids.map(id=>{
+      const n = nodes[id];
+      const tag = n.link ? 'a' : 'div';
+      const linkAttrs = n.link ? ` href="${escapeHtml(n.link)}" target="_blank" rel="noopener"` : '';
+      const style = `left:${Math.round(n.x+offX)}px; top:${Math.round(n.y+offY)}px; width:${Math.round(n.w)}px; height:${Math.round(n.h)}px; background:${n.bg}; border-color:${n.border}; --hover-c:${n.hoverColor}; --hover-c-dim:${hexToRgba(n.hoverColor,.35)};`;
+      return `    <${tag} class="rm-node${n.milestone ? ' rm-milestone':''} rm-hover-${n.hoverEffect||'lift'}" data-id="${id}"${linkAttrs} style="${style}">
+      <div class="rm-node-text" style="color:${n.color};">${escapeHtml(n.text)}</div>
+      <span class="rm-badge">${n.milestone ? 'أساسية' : 'اختيارية'}</span>
+    </${tag}>`;
+    }).join('\n');
+
+    const edgePaths = edges.map(e=>{
+      const a = { x: nodes[e.from].x + nodes[e.from].w/2 + offX, y: nodes[e.from].y + nodes[e.from].h/2 + offY };
+      const b = { x: nodes[e.to].x + nodes[e.to].w/2 + offX, y: nodes[e.to].y + nodes[e.to].h/2 + offY };
+      const milestone = nodes[e.from].milestone && nodes[e.to].milestone;
+      const d = edgeGeometry(a, b, e.bendOffset).d;
+      return `    <path class="rm-edge${milestone?' rm-milestone':''}" data-from="${e.from}" data-to="${e.to}" d="${d}"></path>`;
+    }).join('\n');
+
+    const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>خريطة الطريق</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="rm-wrap">
+  <div class="rm-canvas" style="width:${W}px; height:${H}px;">
+    <svg class="rm-edges" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+${edgePaths}
+    </svg>
+${nodeDivs}
+  </div>
+</div>
+<script src="script.js"><\/script>
+</body>
+</html>
+`;
+
+    const css = `@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root{
+  --bg: #f4f5f7;
+  --accent: #e8542a;
+  --mint: #0f9d72;
+  --mint-dim: #0f9d7233;
+  --text: #1b1f27;
+  --text-dim: #6b7280;
+  --node-bg: #ffffff;
+  --node-border: #d7dae1;
+  --line: #9aa1b0;
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; background:var(--bg); font-family:'IBM Plex Sans Arabic', sans-serif; color:var(--text); }
+.rm-wrap{ width:100%; overflow:auto; padding:40px; }
+.rm-canvas{ position:relative; margin:0 auto; }
+.rm-edges{ position:absolute; top:0; left:0; pointer-events:none; }
+.rm-edge{ fill:none; stroke:var(--line); stroke-width:2.5; transition:stroke .15s, stroke-width .15s; }
+.rm-edge.rm-milestone{ stroke:var(--accent); }
+.rm-edge.rm-active{ stroke:var(--mint); stroke-width:3.5; }
+.rm-node{
+  position:absolute; background:var(--node-bg); border:1.5px solid var(--node-border);
+  border-radius:10px; box-shadow:0 1px 3px rgba(27,31,39,.07);
+  transition:border-color .15s, box-shadow .15s, transform .1s;
+  text-decoration:none; color:inherit; display:block;
+}
+.rm-node.rm-milestone{ border-width:2px; }
+.rm-node.rm-active{ border-color:var(--mint); box-shadow:0 0 0 3px var(--mint-dim); transform:translateY(-2px); }
+.rm-node.rm-hover-lift:hover{ transform:translateY(-3px); border-color:var(--hover-c); box-shadow:0 8px 20px var(--hover-c-dim), 0 2px 6px rgba(27,31,39,.08); }
+.rm-node.rm-hover-glow:hover{ border-color:var(--hover-c); box-shadow:0 0 0 5px var(--hover-c-dim), 0 4px 14px rgba(27,31,39,.1); }
+.rm-node.rm-hover-pulse:hover{ border-color:var(--hover-c); animation: rmPulse 1.3s ease-in-out infinite; }
+@keyframes rmPulse{
+  0%,100%{ box-shadow:0 0 0 0 var(--hover-c-dim); }
+  50%{ box-shadow:0 0 0 8px transparent; }
+}
+.rm-node[href]{ cursor:pointer; }
+.rm-node-text{
+  position:absolute; inset:0; padding:10px 14px; font-size:14px; font-weight:600;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  line-height:1.5; overflow:auto; white-space:pre-wrap; word-break:break-word;
+}
+.rm-badge{
+  position:absolute; bottom:6px; left:14px; font-family:'JetBrains Mono', monospace;
+  font-size:9.5px; color:var(--text-dim);
+}
+`;
+
+    const js = `// تفاعل بسيط: إبراز العقدة والروابط المتصلة بها عند مرور الفأرة
+document.addEventListener('DOMContentLoaded', function(){
+  var nodes = document.querySelectorAll('.rm-node');
+  var edges = document.querySelectorAll('.rm-edge');
+  nodes.forEach(function(node){
+    node.addEventListener('mouseenter', function(){
+      var id = node.dataset.id;
+      node.classList.add('rm-active');
+      edges.forEach(function(edge){
+        if(edge.dataset.from === id || edge.dataset.to === id){
+          edge.classList.add('rm-active');
+        }
+      });
+    });
+    node.addEventListener('mouseleave', function(){
+      node.classList.remove('rm-active');
+      edges.forEach(function(edge){ edge.classList.remove('rm-active'); });
+    });
+  });
+});
+`;
+    return { html, css, js };
+  }
+
+  exportBtn.addEventListener('click', ()=>{
+    const out = buildExport();
+    if(!out){ alert('أضف عقدة واحدة على الأقل قبل التصدير.'); return; }
+    downloadFile('index.html', out.html, 'text/html');
+    setTimeout(()=> downloadFile('style.css', out.css, 'text/css'), 250);
+    setTimeout(()=> downloadFile('script.js', out.js, 'text/javascript'), 500);
+  });
+
+  // ---------- بيانات افتتاحية توضيحية ----------
+  function seed(){
+    const a = createNode(96, 288, 'أساسيات ++C', true, 170, 60);
+    const b = createNode(408, 120, 'المؤشرات والذاكرة', true, 180, 60);
+    const c = createNode(408, 456, 'البرمجة الكائنية OOP', true, 190, 60);
+    const d = createNode(744, 48, 'STL', false, 150, 56, { link: 'https://cppreference.com', hoverColor: '#2f6fed', hoverEffect: 'glow' });
+    const e2 = createNode(744, 264, 'إدارة الذاكرة المتقدمة', false, 200, 72);
+    const f = createNode(744, 480, 'أنماط التصميم', false, 170, 56);
+    createEdge(a,b); createEdge(a,c);
+    createEdge(b,d); createEdge(b,e2);
+    createEdge(c,f); createEdge(c,e2);
+  }
+  seed();
+  setZoom(1);
+})();
+</script>
+</body>
+</html>
