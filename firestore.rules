@@ -1,25 +1,65 @@
 rules_version = '2';
 
+// ملاحظات أمنية:
+// 1) المستخدم ينشئ بروفايله في users/{uid}، لكن مش يقدر يغيّر دوره (role) بعد الإنشاء.
+//    قبل كده كان أي مستخدم يقدر يكتب role:'owner' لنفسه، وده كان تصعيد صلاحيات مؤجل.
+// 2) مخططات المستخدم: القراءة/الكتابة للمالك فقط، والقراءة العامة مقصورة على public (روابط المشاركة).
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidRole(role) {
+      return role == 'owner' || role == 'editor';
+    }
+
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow read: if isSelf(userId);
+
+      allow create: if isSelf(userId)
+        && request.resource.data.role is string
+        && isValidRole(request.resource.data.role)
+        && request.resource.data.email == request.auth.token.email;
+
+      allow update: if isSelf(userId)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email;
+
+      allow delete: if false;
     }
 
     match /diagrams/{diagramId} {
-      allow create: if request.auth != null
-        && request.resource.data.ownerId == request.auth.uid;
+      function isOwner() {
+        return isSignedIn() && resource.data.ownerId == request.auth.uid;
+      }
 
-      allow read: if resource.data.visibility == 'public'
-        || (request.auth != null && resource.data.ownerId == request.auth.uid);
+      function payloadIsValid() {
+        return request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.title is string
+          && request.resource.data.documentJson is map
+          && request.resource.data.visibility in ['private', 'public']
+          && request.resource.data.shareMode in ['view', 'edit']
+          && request.resource.data.documentJson.size() < 900000;
+      }
 
-      allow update: if request.auth != null
-        && resource.data.ownerId == request.auth.uid
-        && request.resource.data.ownerId == resource.data.ownerId;
+      allow create: if isSignedIn() && payloadIsValid();
 
-      allow delete: if request.auth != null
-        && resource.data.ownerId == request.auth.uid;
+      allow read: if resource.data.visibility == 'public' || isOwner();
+
+      // التحديث: نفس صاحب المخطط، ومايتغيرش المالك ولا تاريخ الإنشاء.
+      // بنستخدم diff().affectedKeys() بدل المقارنة المباشرة لأنها بتشتغل بأمان حتى لو الحقل
+      // مش موجود في الطلب — الحفظ التلقائي مابيبعتش createdAt (مع merge القيمة الأصلية بتفضل زي ما هي).
+      allow update: if isOwner()
+        && payloadIsValid()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerId', 'createdAt']);
+
+      allow delete: if isOwner();
     }
   }
 }

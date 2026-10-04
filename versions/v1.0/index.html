@@ -3,9 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- الإصدار: مصدر واحد للحقيقة هو وسم app-version، والـ JS بيقراه ويحطه في شارة الإصدار تحت -->
-<meta name="app-version" content="1.1.0">
-<meta name="description" content="محرّر مخططات وخرائط طريق مرئي بالكامل في المتصفح: عُقد وروابط، تفريع من الروابط، تصدير HTML/CSS/JS أو صورة PNG.">
 <title>باني المخططات — Roadmap Builder</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&family=Almarai:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -89,8 +86,7 @@
     border:1.5px solid var(--node-border);
     border-radius:10px;
     box-shadow: 0 1px 3px #1b1f2712, 0 1px 2px #1b1f2712;
-    /* transform هنا كمان عشان انتقال الهوفر يشتغل من غير ما يتصادم مع أي transform تاني على نفس العنصر */
-    transition: border-color .15s, box-shadow .15s, transform .15s;
+    transition: border-color .15s, box-shadow .15s;
   }
   .node.milestone{ border-color: var(--accent); border-width:2px; }
   .node.milestone::before{
@@ -131,17 +127,12 @@
   .palette-item:hover{ border-color:var(--mint); }
   .palette-item:active{ cursor:grabbing; transform:scale(.97); }
   .pi-ic{ font-size:12px; color:var(--text-dim); width:16px; text-align:center; flex-shrink:0; }
-  .node.hover-eff-lift:hover{ transform:scale(1.02); border-color:var(--hover-c, var(--node-border)); box-shadow:0 8px 20px var(--hover-c-dim, #0f9d7233), 0 2px 6px #1b1f2714; }
+  .node.hover-eff-lift:hover{ transform:translateY(-3px); border-color:var(--hover-c, var(--node-border)); box-shadow:0 8px 20px var(--hover-c-dim, #0f9d7233), 0 2px 6px #1b1f2714; }
   .node.hover-eff-glow:hover{ border-color:var(--hover-c, var(--node-border)); box-shadow:0 0 0 5px var(--hover-c-dim, #0f9d7233), 0 4px 14px #1b1f2718; }
   .node.hover-eff-pulse:hover{ border-color:var(--hover-c, var(--node-border)); animation: nodePulse 1.3s ease-in-out infinite; }
   @keyframes nodePulse{
     0%,100%{ box-shadow:0 0 0 0 var(--hover-c-dim, #0f9d7233); }
     50%{ box-shadow:0 0 0 8px transparent; }
-  }
-
-  /* احترام إعدادات النظام: نوقف الأنيميشن والانتقالات لو المستخدم طالب تقليل الحركة */
-  @media (prefers-reduced-motion: reduce){
-    *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
   }
 
   .node-text{
@@ -156,9 +147,8 @@
     word-break:break-word;
     cursor:grab;
   }
-  /* نص تلقائي الانكماش على الأسطر: بيمنع الفوضى البصرية لما النص يطول أكتر من العقدة */
-  .node-text.auto-fit{ white-space:pre-line; overflow:hidden; }
-  .node-text:active{ cursor:grabbing; }  .node-edit{
+  .node-text:active{ cursor:grabbing; }
+  .node-edit{
     position:absolute; inset:0;
     padding:10px 14px;
     font-family:var(--font-display);
@@ -169,8 +159,6 @@
     border:none; outline:2px solid var(--mint);
     border-radius:9px;
     resize:none;
-    direction:inherit;
-    unicode-bidi:plaintext;
   }
 
   .badge{
@@ -205,14 +193,12 @@
   .port.s{ bottom:-8px; left:50%; transform:translateX(-50%); }
   .port.w{ left:-8px; top:50%; transform:translateY(-50%); }
   .port.e{ right:-8px; top:50%; transform:translateY(-50%); }
-  /* منافذ الزوايا: جوه العقدة شوية (2px) عشان متتصادمش مع مقابض تغيير الحجم،
-     ومركز المنفذ بالظبط عند إزاحة ثابتة (7.5px) بيحسبها anchorForDir —
-     كده خط السهم بيكمل على مركز المنفذ اللي إنت ماسكه بالظبط من غير أي إزاحة */
+  /* منافذ الزوايا: جوه العقدة شوية عشان متتصادمش بصريًا مع مقابض تغيير الحجم اللي برّه الزاوية */
   .port.ne, .port.nw, .port.se, .port.sw{ width:11px; height:11px; }
-  .port.ne{ top:2px; right:2px; }
-  .port.nw{ top:2px; left:2px; }
-  .port.se{ bottom:2px; right:2px; }
-  .port.sw{ bottom:2px; left:2px; }
+  .port.ne{ top:5px; right:5px; }
+  .port.nw{ top:5px; left:5px; }
+  .port.se{ bottom:5px; right:5px; }
+  .port.sw{ bottom:5px; left:5px; }
 
   .resize-handle{
     position:absolute;
@@ -316,41 +302,7 @@
     padding:8px 12px; border-radius:8px; display:flex; gap:14px;
     box-shadow: 0 4px 14px #1b1f2712;
   }
-  /* حالة لوحة المفاتيح: نفس شكل التحديد بالماوس عشان أي عنصر مطبوق عليه focus يبان */
-  .node:focus-visible{ outline:3px solid var(--mint); outline-offset:3px; }
-  .port:focus-visible, .resize-handle:focus-visible, .edge-hit:focus-visible{ outline:2px solid var(--mint); outline-offset:2px; }
-  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
-    outline:3px solid var(--mint); outline-offset:2px;
-  }
-  #skipToCanvas{
-    position:fixed; top:-60px; right:12px; z-index:400;
-    background:var(--text); color:#fff; padding:10px 14px; border-radius:8px;
-    font-size:12.5px; font-weight:600; text-decoration:none; transition:top .15s;
-  }
-  #skipToCanvas:focus{ top:12px; }
-
-  .gate-skip-btn{
-    background:#fff; color:var(--text-dim); border:1px solid var(--node-border);
-    padding:9px 12px;
-  }
-  .gate-skip-btn:hover{ color:var(--text); border-color:var(--text-dim); }
-
-  #status #appVersion{ color:var(--text-dim); opacity:.85; }
-
-  /* قارئ الشاشة: نص حي يتحدّث بالحالة من غير ما يشوّش البصر */
-  #a11yStatus{
-    position:absolute; width:1px; height:1px; margin:-1px; padding:0;
-    overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
-  }
-
-  // شارة إصدار تجريبي اختيارية: طبقة التطبيق أو النشر بيضيفوا الكلاس لما يكون في إصدار قيد التجربة.
-  #betaBanner{
-    position:fixed; inset-inline:0; top:0; z-index:26;
-    background:var(--accent); color:#fff; text-align:center;
-    font-size:11.5px; font-weight:600; padding:5px 10px;
-  }
-  body.has-beta-banner #topBar{ top:26px; }
-  body.has-beta-banner #toolbar{ top:102px; }
+  #status b{ color:var(--text); font-weight:600; }
 
   #zoom-ctl{
     position:fixed; bottom:18px; left:20px; z-index:20; display:flex; gap:6px;
@@ -362,11 +314,6 @@
   #zoom-ctl button:disabled{ opacity:.35; cursor:default; }
   #zoom-ctl button:disabled:hover{ background:transparent; }
   .ctl-sep{ width:1px; align-self:stretch; background:var(--panel-border); margin:2px 1px; }
-  #nodesListBtn .status-dot{
-    position:absolute; bottom:1px; left:1px;
-    width:11px; height:11px; border-radius:50%;
-    background:var(--mint); border:2px solid var(--panel);
-  }
 
   ::selection{ background:var(--mint-dim); }
 
@@ -446,9 +393,7 @@
   /* 300  : شاشة تسجيل الدخول الإجبارية (تحجب كل حاجة تحتها)                              */
   /* 310  : التوستات — لازم تفضل ظاهرة فوق أي حاجة تانية حتى شاشة القفل                    */
 
-  /* أيقونة الحساب العلوية — تحت الشريط العلوي مباشرة عشان متتداخلش بصريًا معاه
-     (التعليق القديم كان بيقول "اليسار/اليمين معكوسان" — ده كان وصف لحالة قديمة) */
-  /* زر الحساب وقائمة العقد: عمود ثابت على اليسار، كل واحد في مكانه — مفيش احتمال تداخل */
+  /* أيقونة الحساب العلوية — تحت الشريط العلوي مباشرة عشان متتداخلش بصريًا معاه */
   .account-icon-btn{
     position:fixed; top:76px; left:20px; z-index:30;
     width:44px; height:44px; border-radius:50%;
@@ -457,7 +402,6 @@
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; padding:0;
   }
-  .nodes-list-icon-btn{ top:130px; }
   .account-icon-btn:hover{ border-color:var(--mint); }
   .account-icon-glyph{ font-size:18px; line-height:1; filter:grayscale(1) opacity(.75); }
   .account-icon-btn .status-dot{
@@ -467,20 +411,17 @@
   }
   body.account-signed-in .account-icon-btn .status-dot{ background:#0f9d72; }
 
-  .nodes-list-icon-btn{ font-size:16px; }
+  .nodes-list-icon-btn{ left:74px; font-size:16px; }
 
   .nodes-list-body{ display:flex; flex-direction:column; gap:6px; }
-  .nodes-list-empty{ color:var(--text-dim); font-size:12.5px; line-height:1.7; }
   .nodes-list-row{
     display:flex; align-items:center; gap:8px;
     background:#fbfbfc; border:1px solid var(--panel-border); border-radius:9px;
     padding:8px 10px; cursor:pointer; user-select:none;
   }
   .nodes-list-row:hover{ border-color:var(--mint); }
-  .nodes-list-row:focus-visible{ outline:2px solid var(--mint); outline-offset:2px; }
   .nodes-list-row.dragging{ opacity:.4; }
-  .nl-handle{ cursor:grab; color:var(--text-dim); font-size:13px; flex-shrink:0; background:none; border:none; padding:2px 4px; }
-  .nl-handle:focus-visible{ outline:2px solid var(--mint); outline-offset:1px; border-radius:4px; }
+  .nl-handle{ cursor:grab; color:var(--text-dim); font-size:13px; flex-shrink:0; }
   .nl-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
   .nl-text{ flex:1; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .nl-del{
@@ -502,7 +443,6 @@
   }
   body.account-drawer-open #accountDrawer{ transform:translateX(0); }
   body.nodes-list-open #nodesListPanel{ transform:translateX(0); }
-  /* أوسمة الظهور: اليسار/اليمين معكوسان لأن الكانفس دلوقتي في النص */
   .account-drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
   .account-drawer-head h2{ margin:0; font-size:15px; }
   .account-section{ display:flex; flex-direction:column; gap:10px; }
@@ -645,9 +585,6 @@
       overflow:hidden;
     }
     #zoom-ctl{ left:10px; bottom:14px; }
-    /* عمود الأزرار على الموبايل: نفس الترتيب لكن أقرب للحواف عشان يفضل في متناول الإبهام */
-    .account-icon-btn{ top:72px; left:10px; width:40px; height:40px; }
-    .nodes-list-icon-btn{ top:120px; }
     .modal{ width:96vw; }
   }
 </style>
@@ -655,13 +592,19 @@
 <body>
 
 <div id="canvas-wrap">
-  <div id="stage" tabindex="0" role="application" aria-label="مساحة عمل المخطط: عناصر قابلة للوصول بمفتاح Tab، Enter للتحديد، F2 للتحرير">
+  <div id="stage">
     <div id="world">
       <div id="grid"></div>
-      <svg id="lines"><defs id="arrowDefs">
-        <!-- رؤوس الأسهم بتُنشأ ديناميكيًا لكل (حجم × لون) عن طريق ensureArrowMarker،
-             لأن الماركر المشترك بيتحكم في كل الخطوط اللي بتستخدمه — لو لونّيناه لخط واحد
-             كانت كل الخطوط بنفس الحجم هتاخد نفس اللون. -->
+      <svg id="lines"><defs>
+        <marker id="arrow-sm" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+        <marker id="arrow-md" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+        <marker id="arrow-lg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="13" markerHeight="13" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
       </defs><g id="lines-g" transform="translate(6000,6000)"></g></svg>
     </div>
   </div>
@@ -820,30 +763,26 @@
   <span>عُقد: <b id="cNodes">0</b></span>
   <span>روابط: <b id="cEdges">0</b></span>
   <span id="modeLabel">جاهز</span>
-  <span id="appVersion" title="إصدار التطبيق">…</span>
 </div>
 
 <div id="zoom-ctl">
-  <button id="undoBtn" type="button" title="تراجع (Ctrl+Z)" aria-label="تراجع">↶</button>
-  <button id="redoBtn" type="button" title="إعادة (Ctrl+Shift+Z)" aria-label="إعادة">↷</button>
+  <button id="undoBtn" title="تراجع (Ctrl+Z)">↶</button>
+  <button id="redoBtn" title="إعادة (Ctrl+Shift+Z)">↷</button>
   <div class="ctl-sep"></div>
-  <button id="zoomOut" type="button" title="تصغير" aria-label="تصغير">−</button>
-  <button id="zoomReset" type="button" style="font-size:11px;" title="إعادة الزوم إلى 100%" aria-label="إعادة الزوم إلى 100%">100%</button>
-  <button id="zoomIn" type="button" title="تكبير" aria-label="تكبير">+</button>
+  <button id="zoomOut">−</button>
+  <button id="zoomReset" style="font-size:11px;">100%</button>
+  <button id="zoomIn">+</button>
 </div>
 
 <div class="modal-backdrop hidden" id="dashboardModal">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dashboardTitle">
+  <div class="modal">
     <div class="modal-head">
-      <h2 id="dashboardTitle">مخططاتي</h2>
-      <button class="btn-ghost" id="closeDashboardBtn" type="button">إغلاق</button>
+      <h2>مخططاتي</h2>
+      <button class="btn-ghost" id="closeDashboardBtn">إغلاق</button>
     </div>
     <div class="diagram-list" id="diagramList"></div>
   </div>
 </div>
-
-<!-- نص حي لقارئ الشاشة: بيتحدّث مع كل إجراء مهم في المحرّر -->
-<div id="a11yStatus" role="status" aria-live="polite"></div>
 
 <div class="share-banner hidden" id="shareBanner">وضع مشاركة للعرض فقط</div>
 
@@ -854,29 +793,25 @@
 </button>
 
 <!-- أيقونة قائمة العقد (زي List View في ووردبريس جوتنبرج) -->
-<!-- شريط التنقيط: بيتخطى الشريط العلوي ويروح للكانفس مباشرة -->
-<a href="#stage" id="skipToCanvas">تخطّي إلى مساحة العمل</a>
-
-<!-- أيقونة قائمة العقد: تحت زر الحساب بمسافة ثابتة (مش فوقه) عشان مفيش تداخل -->
-<button class="account-icon-btn nodes-list-icon-btn" id="nodesListBtn" type="button" title="قائمة العقد" aria-label="فتح قائمة العقد">
+<button class="account-icon-btn nodes-list-icon-btn" id="nodesListBtn" title="قائمة العقد">
   <span class="account-icon-glyph">☰</span>
 </button>
 
 <div class="account-drawer-backdrop hidden" id="nodesListBackdrop"></div>
-<div class="account-drawer nodes-list-panel" id="nodesListPanel" role="dialog" aria-modal="true" aria-labelledby="nodesListTitle">
+<div class="account-drawer nodes-list-panel" id="nodesListPanel">
   <div class="account-drawer-head">
-    <h2 id="nodesListTitle">قائمة العقد</h2>
-    <button class="btn-ghost" id="closeNodesListBtn" type="button">إغلاق</button>
+    <h2>قائمة العقد</h2>
+    <button class="btn-ghost" id="closeNodesListBtn">إغلاق</button>
   </div>
   <p class="account-hint">اسحب من ⋮⋮ لإعادة ترتيب العقد فوق بعض (الأعلى في القائمة = الأعلى ظهورًا). اضغط على أي عقدة للانتقال إليها وتحديدها.</p>
   <div class="nodes-list-body" id="nodesListBody"></div>
 </div>
 
 <div class="account-drawer-backdrop hidden" id="accountDrawerBackdrop"></div>
-<div class="account-drawer" id="accountDrawer" role="dialog" aria-modal="true" aria-labelledby="accountDrawerTitle">
+<div class="account-drawer" id="accountDrawer">
   <div class="account-drawer-head">
-    <h2 id="accountDrawerTitle">الحساب والخريطة</h2>
-    <button class="btn-ghost" id="closeAccountDrawerBtn" type="button">إغلاق</button>
+    <h2>الحساب والخريطة</h2>
+    <button class="btn-ghost" id="closeAccountDrawerBtn">إغلاق</button>
   </div>
 
   <div class="account-section auth-signin-section">
@@ -998,20 +933,6 @@
 
   <hr class="sep">
 
-  <div class="app-panel" id="localPanel">
-    <div class="mini-title">
-      <span>النسخ الاحتياطي المحلي</span>
-    </div>
-    <p class="account-hint">نسخة كاملة من كل خرائطك المحلية في ملف JSON واحد — تشتغل من غير حساب أو إنترنت، ومناسبة كنسخة احتياطية أو للنقل لجهاز تاني.</p>
-    <div class="row">
-      <button class="btn-ghost" id="exportLocalBtn" type="button" style="flex:1">تصدير نسخة</button>
-      <button class="btn-ghost" id="importLocalBtn" type="button" style="flex:1">استيراد نسخة</button>
-    </div>
-    <input type="file" id="importLocalInput" accept="application/json,.json" style="display:none">
-  </div>
-
-  <hr class="sep">
-
   <div class="app-panel" id="cloudPanel">
     <div class="mini-title">
       <span>المشروع والحفظ</span>
@@ -1030,16 +951,15 @@
 </div>
 
 <!-- شاشة تسجيل الدخول الإجبارية: لازم تسجّل دخول قبل ما تقدر تستخدم المحرر (إلا لو فاتح رابط مشاركة عام) -->
-<div class="login-gate hidden" id="loginGate" role="dialog" aria-modal="true" aria-labelledby="loginGateTitle">
+<div class="login-gate hidden" id="loginGate">
   <div class="login-gate-card">
-    <h1 id="loginGateTitle"><span class="dot"></span> باني الخريطة</h1>
+    <h1><span class="dot"></span> باني الخريطة</h1>
     <p>سجّل الدخول بحساب Google الأول عشان تقدر تستخدم التطبيق، تحفظ خرائطك على Firebase، وتنشئ روابط مشاركة حية.</p>
     <button class="google-btn" id="gateGoogleSignInBtn">
       <span class="google-mark">G</span>
       الدخول بحساب Google
     </button>
-    <div class="login-status" id="gateLoginStatus" role="status" aria-live="polite">جاري تجهيز تسجيل الدخول...</div>
-    <button class="gate-skip-btn" id="gateLocalBtn" type="button" style="display:none">المتابعة محليًا بدون سحابة (تجربة سريعة)</button>
+    <div class="login-status" id="gateLoginStatus">جاري تجهيز تسجيل الدخول...</div>
   </div>
 </div>
 
@@ -1048,8 +968,6 @@
   const world = document.getElementById('world');
   const stage = document.getElementById('stage');
   const linesG = document.getElementById('lines-g');
-  const arrowDefs = document.getElementById('arrowDefs');
-  const a11yStatusEl = document.getElementById('a11yStatus');
   const nodeInput = document.getElementById('nodeInput');
   const addBtn = document.getElementById('addBtn');
   const deleteBtn = document.getElementById('deleteBtn');
@@ -1306,14 +1224,6 @@
   function applyTransform(){
     world.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
   }
-
-  // نص حي لقارئ الشاشة: بيتحدّث مع كل تغيير مهم من غير ما نزعّج المستخدم البصري
-  let a11yTimer = null;
-  function announce(text){
-    if(!a11yStatusEl) return;
-    clearTimeout(a11yTimer);
-    a11yTimer = setTimeout(()=>{ a11yStatusEl.textContent = text || ''; }, 120);
-  }
   function snap(v){ return snapEnabled ? Math.round(v / GRID) * GRID : v; }
 
   // يقبل http/https/mailto فقط — يمنع روابط javascript: أو data: الخبيثة من التنفيذ عند الضغط أو بعد التصدير
@@ -1349,76 +1259,7 @@
     node.el.style.setProperty('--hover-c-dim', hexToRgba(node.hoverColor, .35));
     node.el.classList.remove('hover-eff-none','hover-eff-lift','hover-eff-glow','hover-eff-pulse');
     node.el.classList.add('hover-eff-' + (node.hoverEffect || 'lift'));
-    node.el.dataset.hasLink = hasOpenableLink(node) ? '1' : '0';
-    applyNodeA11y(id);
-    fitNodeText(id);
-  }
-
-  // ---------- ملاءمة النص للعقدة ----------
-  // المشكلة اللي بيحلها: النص الطويل كان بيعمل سكرول داخل العقدة، وده بيلخبط الشكل النهائي
-  // (خصوصًا في التصدير لصورة). الحل: نقلّل حجم الخط تدريجيًا لحد ما النص يدخل في العقدة،
-  // وبحد أدنى معقول حتى يفضل مقروء.
-  const TEXT_FIT_MIN_SIZE = 8;
-  function fitNodeText(id){
-    const node = nodes[id];
-    if(!node || !node.textEl) return;
-    const baseSize = node.fontSize || 14;
-    node.textEl.style.fontSize = baseSize + 'px';
-    node.textEl.classList.add('auto-fit');
-    // في بيئات مفيش فيها قياس حقيقي (زي الاختبارات) القيم بتطلع 0 — في الحالة دي بنسيب الحجم الأساسي
-    const availH = node.textEl.clientHeight;
-    const availW = node.textEl.clientWidth;
-    if(!availH || !availW) return;
-    const fits = () => node.textEl.scrollHeight <= availH + 1;
-    if(fits()) return;
-    let size = baseSize;
-    while(size > TEXT_FIT_MIN_SIZE && !fits()){
-      size = Math.max(TEXT_FIT_MIN_SIZE, Math.round((size - 0.5) * 10) / 10);
-      node.textEl.style.fontSize = size + 'px';
-    }
-  }
-
-  // ---------- وصف العقدة لقارئ الشاشة (بيمشي مع حالة العقدة: رابط/أساسية/محددة) ----------
-  function hasOpenableLink(node){
-    return Boolean(node && isSafeLink(node.link));
-  }
-  function shortText(text, max){
-    const t = String(text || '').replace(/\s+/g, ' ').trim();
-    const limit = max || 70;
-    return t.length > limit ? t.slice(0, limit - 1) + '…' : t;
-  }
-  // في وضع التصدير/القراءة-فقط لازم يفضل رابط حقيقي حقيقي قابل للفتح بالكيبورد
-  // (زي ما التصدير بيعمل بالظبط)، وجوّه المحرر بنخليه div ونفتح الرابط بمفتاح Enter أو بضغطة على شارة الرابط
-  function isReadonlyMode(){
-    return document.body.classList.contains('share-readonly');
-  }
-  function applyNodeA11y(id){
-    const node = nodes[id];
-    if(!node) return;
-    const linky = hasOpenableLink(node);
-    const type = node.milestone ? 'عقدة أساسية' : 'عقدة اختيارية';
-    node.el.setAttribute('role', isReadonlyMode() && linky ? 'link' : 'button');
-    node.el.setAttribute('tabindex', '0');
-    node.el.setAttribute('aria-label', `${type}: ${shortText(node.text) || 'بدون نص'}${linky ? ' — فيها رابط، اضغط Enter لفتحه' : ''}`);
-  }
-  function refreshAllNodeA11y(){
-    Object.keys(nodes).forEach(applyNodeA11y);
-    edges.forEach(updateEdgeLabel);
-  }
-
-  // دور العقدة بيتغير حسب وضع العرض (في القراءة فقط العقدة اللي فيها رابط بتبقى role="link").
-  // طبقة التطبيق بتضيف كلاسات على body كتير (panning أثناء السحب مثلًا)، فبنفلتر الكلاسات
-  // المهمة فقط بدل ما نعيد حساب كل الأوصاف مع كل تغيير — وبأجل بسيط لتجميع التغييرات المتتالية.
-  if(typeof MutationObserver !== 'undefined'){
-    const RELEVANT_BODY_CLASSES = ['share-readonly', 'account-signed-in'];
-    let a11yRefreshScheduled = false;
-    const bodyClassObserver = new MutationObserver((mutations)=>{
-      const changed = mutations.some(m => RELEVANT_BODY_CLASSES.some(cls => m.target.classList.contains(cls)));
-      if(!changed || a11yRefreshScheduled) return;
-      a11yRefreshScheduled = true;
-      setTimeout(()=>{ a11yRefreshScheduled = false; refreshAllNodeA11y(); }, 120);
-    });
-    bodyClassObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    node.el.dataset.hasLink = isSafeLink(node.link) ? '1' : '0';
   }
 
   function buildSwatchRow(containerEl, key){
@@ -1555,26 +1396,16 @@
     el.appendChild(badge);
 
     // شارة الرابط: ضغطة مباشرة ومتزامنة تفتح الرابط (لا تتعارض مع السحب أو التحرير)
-    const linkBadge = document.createElement('a');
+    const linkBadge = document.createElement('div');
     linkBadge.className = 'link-badge';
     linkBadge.textContent = '🔗';
     linkBadge.title = 'فتح الرابط';
-    linkBadge.setAttribute('role', 'button');
-    linkBadge.setAttribute('aria-label', 'فتح رابط العقدة في تاب جديد');
     linkBadge.addEventListener('pointerdown', (e)=> e.stopPropagation());
     linkBadge.addEventListener('click', (e)=>{
       e.stopPropagation();
-      e.preventDefault();
-      openNodeLink(id);
+      const node = nodes[id];
+      if(node && isSafeLink(node.link)) window.open(node.link, '_blank', 'noopener');
     });
-    linkBadge.addEventListener('keydown', (e)=>{
-      if(e.key === 'Enter' || e.key === ' '){
-        e.stopPropagation();
-        e.preventDefault();
-        openNodeLink(id);
-      }
-    });
-    linkBadge.tabIndex = -1; // العقدة نفسها هي اللي بتاخد الـ focus، والفتح بـ Enter
     el.appendChild(linkBadge);
 
     ['n','s','e','w','ne','nw','se','sw'].forEach(dir=>{
@@ -1621,23 +1452,6 @@
       }
     });
     textEl.addEventListener('dblclick', (e)=>{ e.stopPropagation(); enterEditMode(id); });
-    // الكيبورد: العقدة نفسها قابلة للوصول بـ Tab، وEnter بيحددها (أو يفتح رابطها في وضع العرض فقط)، وF2 للتحرير
-    el.addEventListener('keydown', (e)=>{
-      if(e.target !== el) return;
-      if(e.key === 'Enter'){
-        e.preventDefault();
-        e.stopPropagation();
-        if(isReadonlyMode() && hasOpenableLink(nodes[id])) openNodeLink(id); else selectNode(id);
-      } else if(e.key === ' '){
-        e.preventDefault();
-        e.stopPropagation();
-        if(e.shiftKey) toggleMultiSelect(id); else selectNode(id);
-      } else if(e.key === 'F2'){
-        e.preventDefault();
-        e.stopPropagation();
-        enterEditMode(id);
-      }
-    });
 
     updateCounts();
     return id;
@@ -1645,17 +1459,6 @@
 
   function bringToFront(id){
     nodes[id].el.style.zIndex = zTop++;
-  }
-
-  // ---------- فتح رابط العقدة (شارة الرابط + كيبورد) ----------
-  function openNodeLink(id){
-    const node = nodes[id];
-    if(!node) return;
-    if(!isSafeLink(node.link)){
-      rbToast('العقدة دي ملهاش رابط صالح (مسموح http / https / mailto بس).', 'error');
-      return;
-    }
-    window.open(node.link, '_blank', 'noopener');
   }
 
   // ---------- تحرير النص بحرية ----------
@@ -1674,8 +1477,6 @@
       node.textEl.textContent = node.text;
       node.textEl.style.display = '';
       ta.remove();
-      applyNodeA11y(id);
-      fitNodeText(id);
       if(changed) commitHistory();
     }
     ta.addEventListener('blur', finish);
@@ -1889,9 +1690,7 @@
     if(nodeEl){
       const targetNode = nodes[nodeEl.dataset.id];
       const dropPoint = stagePoint(clientX, clientY);
-      // أقرب منفذ فعلي لنقطة الإفلات (مش اتجاه من المركز) — كده السهم بيلتقي
-      // بالمنفذ الأقرب لمكان الإفلات بالظبط، زي ما المستخدم شايفه بعينه
-      const dir = nearestPortDir(targetNode, dropPoint);
+      const dir = autoDir(centerPoint(targetNode), dropPoint);
       return { type:'node', nodeId: nodeEl.dataset.id, anchor: dir };
     }
     const hitEl = hovered.closest('.edge-hit');
@@ -1956,23 +1755,16 @@
   function centerPoint(node){ return { x: node.x + node.w/2, y: node.y + node.h/2 }; }
 
   // نقطة على محيط العقدة عند إحدى الأماكن الثمانية (4 زوايا + 4 أنصاف أضلاع)
-  // إزاحة مركز منافذ الزوايا عن رُكن العقدة — لازم تطابق قيم CSS بالظبط:
-  // .port.ne{ top:2px; right:2px; } مع حجم منفذ 11px ⇒ مركز المنفذ عند (‑7.5px، ‑7.5px) من الرُكن
-  // (نصف المنفذ 5.5px + الإزاحة 2px = 7.5px). لو غيّرت الـ CSS غيّر الثابت ده معاه، وإلا هتظهر إزاحة.
-  const CORNER_PORT_OFFSET = 7.5;
-
   function anchorForDir(node, dir){
     switch(dir){
       case 'n': return { x: node.x + node.w/2, y: node.y };
       case 's': return { x: node.x + node.w/2, y: node.y + node.h };
       case 'e': return { x: node.x + node.w, y: node.y + node.h/2 };
       case 'w': return { x: node.x, y: node.y + node.h/2 };
-      /* الزوايا: نقطة الارتكاز على مركز المنفذ المرئي نفسه (مش الرُكن الحرفي) —
-         كده خط السهم بيكمل على مكان اللي إنت ماسكه بالظبط، والاتصال مايتحركش لو العقدة اتحركت */
-      case 'ne': return { x: node.x + node.w - CORNER_PORT_OFFSET, y: node.y + CORNER_PORT_OFFSET };
-      case 'nw': return { x: node.x + CORNER_PORT_OFFSET, y: node.y + CORNER_PORT_OFFSET };
-      case 'se': return { x: node.x + node.w - CORNER_PORT_OFFSET, y: node.y + node.h - CORNER_PORT_OFFSET };
-      case 'sw': return { x: node.x + CORNER_PORT_OFFSET, y: node.y + node.h - CORNER_PORT_OFFSET };
+      case 'ne': return { x: node.x + node.w, y: node.y };
+      case 'nw': return { x: node.x, y: node.y };
+      case 'se': return { x: node.x + node.w, y: node.y + node.h };
+      case 'sw': return { x: node.x, y: node.y + node.h };
       default: return centerPoint(node);
     }
   }
@@ -1983,32 +1775,6 @@
     const deg = (Math.atan2(dy, dx) * 180/Math.PI + 360) % 360;
     const dirs = ['e','se','s','sw','w','nw','n','ne'];
     return dirs[Math.round(deg / 45) % 8];
-  }
-  // أقرب منفذ فعلي لنقطة معيّنة — بيستخدم مسافة حقيقية لمواقع المنافذ الثمانية
-  // (مش زاوية الاتجاه بس)، عشان السهم يبقى على المنفذ اللي الأقرب لمكان الإفلات فعلاً
-  function nearestPortDir(node, targetPoint){
-    const dirs = ['n','s','e','w','ne','nw','se','sw'];
-    let best = 'e', bestDist = Infinity;
-    dirs.forEach(dir=>{
-      const p = anchorForDir(node, dir);
-      const d = (p.x - targetPoint.x) * (p.x - targetPoint.x) + (p.y - targetPoint.y) * (p.y - targetPoint.y);
-      if(d < bestDist){ bestDist = d; best = dir; }
-    });
-    return best;
-  }
-  // تجميد أطراف 'auto' للرابط: بيتحوّلوا لأقرب منفذ فعلي في اللحظة الحالية،
-  // وبعدها الرابط بيفضل ملتصق بنفس المنفذ مهما تحركت العقد.
-  // بيتنادى مرة واحدة عند إنشاء الرابط (ولو عند التحميل لأرطة قديمة بدون أطراف محفوظة).
-  function freezeAutoAnchors(edge){
-    const { a, b } = getEdgeAB(edge);
-    if(edge.fromAnchor === 'auto' && edge.from){
-      const node = nodes[edge.from];
-      if(node) edge.fromAnchor = nearestPortDir(node, b);
-    }
-    if(edge.toAnchor === 'auto' && edge.to){
-      const node = nodes[edge.to];
-      if(node) edge.toAnchor = nearestPortDir(node, a);
-    }
   }
   // نقطة اتصال فعلية على حافة العقدة: تلقائية حسب اتجاه العقدة الأخرى، أو مكان محدد يدويًا
   function resolveAnchor(node, otherCenter, dirSetting){
@@ -2178,12 +1944,6 @@
     };
     edges.push(edge);
 
-    // تجميد الارتكاز التلقائي: أي طرف متروك 'auto' بيتحوّل فورًا لأقرب منفذ فعلي (8 اتجاهات)
-    // حسب الوضع الحالي للعقدتين، وبعدها بيفضل ثابت مهما تحركت العقد —
-    // ده اللي بيمنع السهم من القفز بين المنافذ مع كل حركة عقدة.
-    // الأطراف اللي جاية من سحب يدوي (fromAnchor/toAnchor محددين) بتتحترم زي ما هي.
-    freezeAutoAnchors(edge);
-
     hit.addEventListener('pointerdown', (e)=> startBranchDrag(e, id));
     handle.addEventListener('pointerdown', (e)=> startEdgeGrab(e, id));
     hit.addEventListener('dblclick', (e)=>{
@@ -2198,37 +1958,11 @@
     updateCounts();
   }
 
-  // رأس السهم: نضبط اتجاهه ومقاسه، ولونه بنعمله ماركر مستقل بنفس اللون
-  const ARROW_MARKER_WIDTHS = { sm: 6, md: 9, lg: 13 };
-  const DEFAULT_EDGE_COLOR = '#9aa1b0';
-  const arrowMarkerIds = new Map();
-  function ensureArrowMarker(size, color){
-    const s = ARROW_MARKER_WIDTHS[size] ? size : 'md';
-    const c = color || DEFAULT_EDGE_COLOR;
-    const key = s + '-' + c.replace(/[^a-z0-9]/gi, '');
-    if(arrowMarkerIds.has(key)) return arrowMarkerIds.get(key);
-    const id = 'arrow-' + key;
-    const marker = document.createElementNS('http://www.w3.org/2000/svg','marker');
-    marker.setAttribute('id', id);
-    marker.setAttribute('viewBox', '0 0 10 10');
-    marker.setAttribute('refX', '8');
-    marker.setAttribute('refY', '5');
-    marker.setAttribute('markerWidth', String(ARROW_MARKER_WIDTHS[s]));
-    marker.setAttribute('markerHeight', String(ARROW_MARKER_WIDTHS[s]));
-    marker.setAttribute('orient', 'auto-start-reverse');
-    const shape = document.createElementNS('http://www.w3.org/2000/svg','path');
-    shape.setAttribute('d', 'M0,0 L10,5 L0,10 z');
-    // لون صريح مش context-stroke — عشان اللون يشتغل في كل المتصفحات مش في كروم بس
-    shape.setAttribute('fill', c);
-    marker.appendChild(shape);
-    arrowDefs.appendChild(marker);
-    arrowMarkerIds.set(key, id);
-    return id;
-  }
+  // تحديث رأس السهم (بدون / وجهة / مصدر / الاتجاهين) بلون مطابق لنوع الخط
   function updateEdgeMarkers(id){
     const edge = edges.find(e=>e.id===id);
     if(!edge) return;
-    const markerId = ensureArrowMarker(edge.arrowSize, edge.color);
+    const markerId = 'arrow-' + (edge.arrowSize || 'md');
     edge.pathEl.removeAttribute('marker-start');
     edge.pathEl.removeAttribute('marker-end');
     if(edge.arrow === 'end' || edge.arrow === 'both'){
@@ -2238,6 +1972,7 @@
       edge.pathEl.setAttribute('marker-start', `url(#${markerId})`);
     }
   }
+
   // سحب الخط نفسه (من أي نقطة عليه) أو من مقبضه الدائري لثنيه وفكّ أي تصادم بينه وبين خطوط تانية
   let edgeBendState = null;
   function startEdgeGrab(e, id){
@@ -2278,21 +2013,6 @@
     edge.handleEl.setAttribute('cx', geo.ctrl.x);
     edge.handleEl.setAttribute('cy', geo.ctrl.y);
     edge.pathEl.style.stroke = edge.color || '';
-    // اللون اتغير؟ لازم نعيد ضبط الماركر كمان، لآن لون السهم جزء من الماركر نفسه
-    updateEdgeMarkers(edge.id);
-    updateEdgeLabel(edge);
-  }
-  // تحديث وصف الوصلة لقارئ الشاشة (من/إلى) — بيتنادى من أي مكان بتتغير فيه هندسة الخط
-  function updateEdgeLabel(edge){
-    if(!edge || !edge.hitEl) return;
-    const from = edge.fromEdge ? 'تفريع' : nodeLabelOf(edge.from);
-    const to = edge.toEdge ? 'تفريع' : nodeLabelOf(edge.to);
-    const arrowWord = edge.arrow === 'none' ? 'بدون سهم' : edge.arrow === 'both' ? 'سهم في الاتجاهين' : edge.arrow === 'start' ? 'سهم عكسي' : 'سهم للوجهة';
-    edge.hitEl.setAttribute('aria-label', `رابط من ${from} إلى ${to}، ${arrowWord}`);
-  }
-  function nodeLabelOf(id){
-    const n = id ? nodes[id] : null;
-    return n && n.text ? n.text : 'عقدة';
   }
   // كل الخطوط ممكن تعتمد هندسيًا على بعضها (تفرّع من خط) فبنعيد حساب الكل بأمان بدل خط واحد بس
   function refreshAllEdges(){
@@ -2430,7 +2150,6 @@
     const node = nodes[selectedNode];
     node.w = Math.max(MIN_W, parseInt(wInput.value)||DEFAULT_W);
     node.el.style.width = node.w + 'px';
-    fitNodeText(selectedNode);
     updateEdgesFor(selectedNode);
   });
   wInput.addEventListener('change', ()=> selectedNode && commitHistory());
@@ -2439,7 +2158,6 @@
     const node = nodes[selectedNode];
     node.h = Math.max(MIN_H, parseInt(hInput.value)||DEFAULT_H);
     node.el.style.height = node.h + 'px';
-    fitNodeText(selectedNode);
     updateEdgesFor(selectedNode);
   });
   hInput.addEventListener('change', ()=> selectedNode && commitHistory());
@@ -2506,23 +2224,15 @@
   });
 
   // ---------- تحريك اللوحة (Pan) والتكبير (Zoom) ----------
-  // الزر الأيمن = تحريك مساحة الرسم بالكامل (بديل مباشر لمفتاح المسافة، والاثنين شغالين مع بعض)
-  // contextmenu ممنوع على الكانفس عشان القائمة الافتراضية ماتظهر وسط السحب
   let panState = null;
-  stage.addEventListener('contextmenu', (e)=>{
-    // منع قائمة السياق دايمًا على خلفية الرسم — الزر الأيمن مخصص للسحب، وده سلوك متوقع
-    // زي كل برامج الرسم (Figma/Miro). قائمة السياق بتفضل شغالة فوق العقد والخطوط نفسها.
-    if(e.target === stage || e.target.id === 'canvas-wrap' || e.target.id === 'grid') e.preventDefault();
-  });
   stage.addEventListener('pointerdown', (e)=>{
     if(e.target !== stage && e.target.id !== 'canvas-wrap' && e.target.id !== 'grid') return;
-    if(spaceHeld || e.button === 2){
-      // الزر الأيمن أو مفتاح المسافة: بندّي اللوحة من غير ما نلغي التحديد الحالي
+    if(spaceHeld){
+      clearSelection();
       panState = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
       stage.classList.add('panning');
       window.addEventListener('pointermove', onPan);
       window.addEventListener('pointerup', endPan);
-      e.preventDefault();
     } else {
       startMarquee(e);
     }
@@ -2798,27 +2508,21 @@
     history.push(snapshotState());
     if(history.length > HISTORY_LIMIT) history.shift();
     future = [];
-    markChanged();
-  }
-  // أي تغيير في السجل (إضافة/تراجع/إعادة) لازم يبلّغ طبقة التطبيق عشان الحفظ التلقائي يلقطه
-  function markChanged(reason){
     updateHistoryButtons();
-    window.dispatchEvent(new CustomEvent('roadmap:changed', { detail: snapshotState(), bubbles:false }));
-    if(reason) announce(reason);
+    window.dispatchEvent(new CustomEvent('roadmap:changed', { detail: snapshotState() }));
   }
-
   function undo(){
     if(history.length < 2) return;
     future.push(history.pop());
     restoreState(JSON.parse(JSON.stringify(history[history.length-1])));
-    markChanged('تم التراجع');
+    updateHistoryButtons();
   }
   function redo(){
     if(future.length === 0) return;
     const next = future.pop();
     history.push(next);
     restoreState(JSON.parse(JSON.stringify(next)));
-    markChanged('تمت الإعادة');
+    updateHistoryButtons();
   }
   function updateHistoryButtons(){
     undoBtn.disabled = history.length < 2;
@@ -2851,12 +2555,6 @@
     const offX = PAD - minX, offY = PAD - minY;
     const W = Math.ceil(maxX - minX + PAD*2);
     const H = Math.ceil(maxY - minY + PAD*2);
-    const usedArrowSizes = [...new Set(edges.map(e=> e.arrowSize || 'md'))];
-    // ألوان الأسهم المستخدمة: كل لون بياخد ماركر خاص بيه لنفس الحجم، فمفيش تكرار في المعرّفات
-    const arrowColors = [...new Set(edges.map(e=> e.color || '#9aa1b0'))];
-    const edgeColorIndex = c => arrowColors.indexOf(c || '#9aa1b0');
-    const edgeColorOf = e => e.color || '#9aa1b0';
-    const markerIdFor = e => `rm-arrow-${e.arrowSize || 'md'}-${edgeColorIndex(edgeColorOf(e))}`;
 
     const nodeDivs = ids.map(id=>{
       const n = nodes[id];
@@ -2864,10 +2562,7 @@
       const tag = safeLink ? 'a' : 'div';
       const linkAttrs = safeLink ? ` href="${escapeHtml(n.link)}" target="_blank" rel="noopener"` : '';
       const style = `left:${Math.round(n.x+offX)}px; top:${Math.round(n.y+offY)}px; width:${Math.round(n.w)}px; height:${Math.round(n.h)}px; background:${n.bg}; border-color:${n.border}; border-width:${n.borderWidth != null ? n.borderWidth : (n.milestone ? 2 : 1.5)}px; --hover-c:${n.hoverColor}; --hover-c-dim:${hexToRgba(n.hoverColor,.35)};`;
-      const a11y = safeLink
-        ? ` aria-label="${escapeHtml(shortText(n.text))} (يفتح في تاب جديد)"`
-        : ` role="img" aria-label="${escapeHtml((n.milestone ? 'عقدة أساسية: ' : 'عقدة: ') + shortText(n.text))}"`;
-      return `    <${tag} class="rm-node${n.milestone ? ' rm-milestone':''} rm-hover-${n.hoverEffect||'lift'}" data-id="${id}"${linkAttrs}${a11y} style="${style}">
+      return `    <${tag} class="rm-node${n.milestone ? ' rm-milestone':''} rm-hover-${n.hoverEffect||'lift'}" data-id="${id}"${linkAttrs} style="${style}">
       <div class="rm-node-text" style="color:${n.color}; font-family:${n.fontFamily || "'IBM Plex Sans Arabic', sans-serif"}; font-size:${n.fontSize || 14}px;">${escapeHtml(n.text)}</div>
     </${tag}>`;
     }).join('\n');
@@ -2877,25 +2572,25 @@
       const a = { x: rawA.x + offX, y: rawA.y + offY };
       const b = { x: rawB.x + offX, y: rawB.y + offY };
       const geo = computeGeometry(a, b, e);
-      const markerId = markerIdFor(e);
+      const markerId = 'rm-arrow-' + (e.arrowSize || 'md');
       const arrow = e.arrow || 'end';
       const markerAttrs =
         (arrow === 'end' || arrow === 'both' ? ` marker-end="url(#${markerId})"` : '') +
         (arrow === 'start' || arrow === 'both' ? ` marker-start="url(#${markerId})"` : '');
-      return `    <path class="rm-edge${e.milestone?' rm-milestone':''}" data-from="${e.from||''}" data-to="${e.to||''}" d="${geo.d}"${markerAttrs} style="stroke:${edgeColorOf(e)}"></path>`;
+      const strokeStyle = e.color ? ` style="stroke:${e.color}"` : '';
+      return `    <path class="rm-edge${e.milestone?' rm-milestone':''}" data-from="${e.from||''}" data-to="${e.to||''}" d="${geo.d}"${markerAttrs}${strokeStyle}></path>`;
     }).join('\n');
 
-    const arrowWordOf = e => e.arrow === 'none' ? 'بدون سهم' : e.arrow === 'both' ? 'سهم في الاتجاهين' : e.arrow === 'start' ? 'سهم عكسي' : 'سهم للوجهة';
-    const edgeLabels = edges.map((e, i)=>`      <p>وصلة ${i+1}: من ${escapeHtml(e.fromEdge ? 'تفريع' : shortText(nodes[e.from] && nodes[e.from].text))} إلى ${escapeHtml(e.toEdge ? 'تفريع' : shortText(nodes[e.to] && nodes[e.to].text))}، ${arrowWordOf(e)}.</p>`).join('\n');
-
-    // كل ماركر بلون صريح وبمعرّف مستقل (حجم × لون) — عشان fill:context-stroke غير مدعوم في Firefox
     const edgeDefs = `      <defs>
-${usedArrowSizes.filter(()=>edges.length>0).map(size=>{
-      const w = size === 'sm' ? 6 : size === 'lg' ? 13 : 9;
-      return arrowColors.map((color, idx)=>`        <marker id="rm-arrow-${size}-${idx}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="${w}" markerHeight="${w}" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill="${color}"></path>
-        </marker>`).join('\n');
-    }).join('\n')}
+        <marker id="rm-arrow-sm" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+        <marker id="rm-arrow-md" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
+        <marker id="rm-arrow-lg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="13" markerHeight="13" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa1b0" style="fill:context-stroke"></path>
+        </marker>
       </defs>`;
 
     const html = `<!DOCTYPE html>
@@ -2963,31 +2658,26 @@ html,body{ margin:0; padding:0; background:var(--bg); font-family:'IBM Plex Sans
   display:flex; align-items:center; justify-content:center; text-align:center;
   line-height:1.5; overflow:auto; white-space:pre-wrap; word-break:break-word;
 }
-.rm-node:focus-visible{ outline:3px solid var(--mint); outline-offset:3px; }
-@media (prefers-reduced-motion: reduce){
-  *{ transition-duration:.001ms !important; animation-duration:.001ms !important; }
-}
 `;
 
-    const js = `// تفاعل بسيط: إبراز العقدة والروابط المتصلة بها عند مرور الفأرة أو التركيز بالكيبورد
+    const js = `// تفاعل بسيط: إبراز العقدة والروابط المتصلة بها عند مرور الفأرة
 document.addEventListener('DOMContentLoaded', function(){
   var nodes = document.querySelectorAll('.rm-node');
   var edges = document.querySelectorAll('.rm-edge');
-  function highlight(node, on){
-    var id = node.dataset.id;
-    node.classList.toggle('rm-active', on);
-    edges.forEach(function(edge){
-      if(edge.dataset.from === id || edge.dataset.to === id){
-        edge.classList.toggle('rm-active', on);
-      }
-    });
-  }
   nodes.forEach(function(node){
-    node.addEventListener('mouseenter', function(){ highlight(node, true); });
-    node.addEventListener('mouseleave', function(){ highlight(node, false); });
-    // نفس الإبراز بالكيبورد — النص النهائي المتصدّر قابل للتنقل بـ Tab
-    node.addEventListener('focus', function(){ highlight(node, true); });
-    node.addEventListener('blur', function(){ highlight(node, false); });
+    node.addEventListener('mouseenter', function(){
+      var id = node.dataset.id;
+      node.classList.add('rm-active');
+      edges.forEach(function(edge){
+        if(edge.dataset.from === id || edge.dataset.to === id){
+          edge.classList.add('rm-active');
+        }
+      });
+    });
+    node.addEventListener('mouseleave', function(){
+      node.classList.remove('rm-active');
+      edges.forEach(function(edge){ edge.classList.remove('rm-active'); });
+    });
   });
 });
 `;
@@ -2997,22 +2687,10 @@ document.addEventListener('DOMContentLoaded', function(){
   // ================= تصدير كصورة PNG =================
   // بنستخدم نفس مخرجات buildExport() (نفس الشكل بالظبط اللي بيتصدّر HTML) ونرسمها في عنصر مخفي
   // بعيد عن أي تحويل Pan/Zoom حالي، عشان الصورة تطلع ثابتة بغض النظر عن وضع الكاميرا وقت التصدير.
-
-  // صيغة الإخراج: نوع + لون + مقاس + دقة + خلفية — كل خيار بيأثر على الملف الناتج بشكل مقصود
-  const PNG_SIZE_PRESETS = {
-    natural: null,
-    hd: { w:1280, h:720 },
-    fullhd: { w:1920, h:1080 },
-    square: { w:1080, h:1080 }
-  };
   let _html2canvasPromise = null;
-  // مصدر المكتبة: نجرّب CDN أولًا، ولو فشل (أوفلاين أو شبكة مقفولة) نجرّب نسخة محلية اختيارية
-  // جوّا vendor/html2canvas.esm.js — لو الملف موجود التصدير يشتغل من غير إنترنت.
   function loadHtml2Canvas(){
     if(!_html2canvasPromise){
-      _html2canvasPromise = import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')
-        .then(m => m.default || m)
-        .catch(()=> import('./vendor/html2canvas.esm.js').then(m => m.default || m));
+      _html2canvasPromise = import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm').then(m => m.default || m);
     }
     return _html2canvasPromise;
   }
@@ -3027,6 +2705,13 @@ document.addEventListener('DOMContentLoaded', function(){
     const height = parseInt(canvasEl.style.height, 10) || canvasEl.offsetHeight;
     return { canvasHTML: canvasEl.outerHTML, css: out.css, width, height };
   }
+
+  const PNG_SIZE_PRESETS = {
+    natural: null,
+    hd: { w:1280, h:720 },
+    fullhd: { w:1920, h:1080 },
+    square: { w:1080, h:1080 }
+  };
 
   async function renderFragmentToCanvas(fragment, background, dpiScale){
     const wrapper = document.createElement('div');
@@ -3067,13 +2752,12 @@ document.addEventListener('DOMContentLoaded', function(){
       const baseCanvas = await renderFragmentToCanvas(fragment, opts.background, opts.dpiScale);
 
       let finalCanvas = baseCanvas;
-      const preset = (opts.sizePreset && opts.sizePreset !== 'natural') ? PNG_SIZE_PRESETS[opts.sizePreset] : null;
+      const preset = PNG_SIZE_PRESETS[opts.sizePreset];
       const target = opts.sizePreset === 'custom'
         ? { w: Math.max(64, opts.customW||baseCanvas.width), h: Math.max(64, opts.customH||baseCanvas.height) }
         : preset;
 
       if(target){
-        // مقاس نهائي بالبكسل: الأبعاد المعروضة × معامل الدقة (2× يطلع ضعف المقاس بالظبط)
         finalCanvas = document.createElement('canvas');
         finalCanvas.width = Math.round(target.w * opts.dpiScale);
         finalCanvas.height = Math.round(target.h * opts.dpiScale);
@@ -3082,11 +2766,9 @@ document.addEventListener('DOMContentLoaded', function(){
           ctx.fillStyle = opts.background;
           ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
         }
-        // "natural" = نحافظ على الرسم بمقاسه الأصلي مع نفس معامل الدقة من غير تكبير مصطنع
-        const drawW = baseCanvas.width, drawH = baseCanvas.height;
+        const scaleFit = Math.min(finalCanvas.width / baseCanvas.width, finalCanvas.height / baseCanvas.height);
+        const drawW = baseCanvas.width * scaleFit, drawH = baseCanvas.height * scaleFit;
         const dx = (finalCanvas.width - drawW) / 2, dy = (finalCanvas.height - drawH) / 2;
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(baseCanvas, dx, dy, drawW, drawH);
       }
 
@@ -3329,23 +3011,20 @@ document.addEventListener('DOMContentLoaded', function(){
       (parseInt(nodes[b].el.style.zIndex,10)||0) - (parseInt(nodes[a].el.style.zIndex,10)||0)
     );
     if(ordered.length === 0){
-      nodesListBody.innerHTML = '<p class="nodes-list-empty">مفيش عقد في المخطط لسه. اكتب عنوان الخطوة فوق واضغط "أضف" أو اسحب عنصر جاهز على مساحة العمل.</p>';
+      nodesListBody.innerHTML = '<p class="account-hint" style="padding:6px 2px;">مفيش عقد في المخطط لسه.</p>';
       return;
     }
-    ordered.forEach((id, index)=>{
+    ordered.forEach(id=>{
       const n = nodes[id];
       const row = document.createElement('div');
       row.className = 'nodes-list-row';
       row.draggable = true;
       row.dataset.id = id;
-      row.tabIndex = 0;
-      row.setAttribute('role', 'listitem');
-      row.setAttribute('aria-label', `${index + 1} من ${ordered.length}: ${n.text || 'بدون نص'}`);
       row.innerHTML = `
-        <button type="button" class="nl-handle" title="سحب لإعادة الترتيب" aria-label="سحب لإعادة الترتيب">⋮⋮</button>
+        <span class="nl-handle">⋮⋮</span>
         <span class="nl-dot"></span>
         <span class="nl-text"></span>
-        <button type="button" class="nl-del" title="حذف" aria-label="حذف العقدة">✕</button>
+        <button type="button" class="nl-del" title="حذف">✕</button>
       `;
       row.querySelector('.nl-dot').style.background = n.milestone ? '#e8542a' : '#9aa1b0';
       row.querySelector('.nl-text').textContent = n.text || '(بدون نص)';
@@ -3353,14 +3032,6 @@ document.addEventListener('DOMContentLoaded', function(){
         if(e.target.closest('.nl-del')) return;
         selectNode(id);
         focusOnNode(id);
-      });
-      // إعادة الترتيب بالكيبورد: Alt + أسهم فوق/تحت تنقل العقدة درجة في الترتيب
-      row.addEventListener('keydown', (e)=>{
-        if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-        if(!e.altKey) return;
-        e.preventDefault();
-        const delta = e.key === 'ArrowUp' ? 1 : -1;
-        moveNodeInStackingOrder(id, delta);
       });
       row.querySelector('.nl-del').addEventListener('click', (e)=>{
         e.stopPropagation();
@@ -3381,34 +3052,17 @@ document.addEventListener('DOMContentLoaded', function(){
       nodesListBody.appendChild(row);
     });
   }
-  // إعادة ترتيب العقد في قائمة العقد بالكيبورد (بديل كامل للسحب) — delta موجب = لفوق في القائمة
-  function moveNodeInStackingOrder(id, delta){
-    const rows = [...nodesListBody.querySelectorAll('.nodes-list-row')];
-    const idx = rows.findIndex(r=> r.dataset.id === id);
-    if(idx < 0) return;
-    const target = idx - delta;
-    if(target < 0 || target >= rows.length) return;
-    const order = rows.map(r=> r.dataset.id);
-    order.splice(idx, 1);
-    order.splice(target, 0, id);
-    applyStackingOrder(order);
-    buildNodesListPanel();
-    const newRow = nodesListBody.querySelector(`.nodes-list-row[data-id="${id}"]`);
-    if(newRow) newRow.focus();
-    announce(`تم نقل العقدة للمركز ${target + 1} في الترتيب`);
-  }
-  function applyStackingOrder(order){
-    const total = order.length;
-    order.forEach((nodeId, idx)=>{ if(nodes[nodeId]) nodes[nodeId].el.style.zIndex = total - idx; });
-    zTop = total + 1;
-    commitHistory();
-  }
-
   nodesListBody.addEventListener('drop', (e)=>{
     e.preventDefault();
     const rows = [...nodesListBody.querySelectorAll('.nodes-list-row')];
     if(rows.length === 0) return;
-    applyStackingOrder(rows.map(row=> row.dataset.id));
+    const total = rows.length;
+    rows.forEach((row, idx)=>{
+      const id = row.dataset.id;
+      if(nodes[id]) nodes[id].el.style.zIndex = total - idx;
+    });
+    zTop = total + 1;
+    commitHistory();
   });
 
   function openNodesListPanel(){
@@ -3418,9 +3072,6 @@ document.addEventListener('DOMContentLoaded', function(){
     buildNodesListPanel();
     document.body.classList.add('nodes-list-open');
     nodesListBackdrop.classList.remove('hidden');
-    // نروّح بالـ focus جوّا اللوحة عشان الكيبورد يشتغل فيها فورًا
-    const first = nodesListBody.querySelector('.nodes-list-row');
-    (first || closeNodesListBtn).focus();
   }
   function closeNodesListPanel(){
     document.body.classList.remove('nodes-list-open');
@@ -3429,17 +3080,6 @@ document.addEventListener('DOMContentLoaded', function(){
   nodesListBtn.addEventListener('click', openNodesListPanel);
   closeNodesListBtn.addEventListener('click', closeNodesListPanel);
   nodesListBackdrop.addEventListener('click', closeNodesListPanel);
-
-  // Esc بيقفل أي لوحة مفتوحة (قائمة العقد / درج الحساب)
-  window.addEventListener('keydown', (e)=>{
-    if(e.key !== 'Escape') return;
-    if(document.body.classList.contains('nodes-list-open')) closeNodesListPanel();
-    if(document.body.classList.contains('account-drawer-open')){
-      document.body.classList.remove('account-drawer-open');
-      const backdrop = document.getElementById('accountDrawerBackdrop');
-      if(backdrop) backdrop.classList.add('hidden');
-    }
-  });
 
   window.RoadmapBuilder = {
     getState: function(){ return snapshotState(); },
@@ -3467,31 +3107,10 @@ document.addEventListener('DOMContentLoaded', function(){
     createEdge(b,d); createEdge(b,e2);
     createEdge(c,f); createEdge(c,e2);
   }
-
-  // ---------- شارة الإصدار: مصدرها وسم meta واحد عشان مفيش رقمين مختلفين في المشروع ----------
-  const versionMeta = document.querySelector('meta[name="app-version"]');
-  const APP_VERSION = versionMeta ? versionMeta.content : '';
-  const versionEl = document.getElementById('appVersion');
-  if(versionEl) versionEl.textContent = APP_VERSION ? 'v' + APP_VERSION : '';
-
   seed();
   commitHistory();
+  updateHistoryButtons();
   setZoom(1);
-
-  // ---------- جسر التهيئة: كل حاجة تخرج من الـ IIFE من هنا فقط ----------
-  // (بيتفادى تمرير آلاف الأسطر كـ arguments، ويسمح لسكربت الاختبار يقلع المحرّر برمجيًا)
-  window.__roadmapBuilderInternals = {
-    nodes, edges, seed, commitHistory, updateHistoryButtons, setZoom, announce,
-    snapshotState, restoreState, loadDocumentState, createBlankDocument, clearDocument,
-    buildExport, updateEdgePath, updateEdgeMarkers, updateEdgeLabel, applyNodeA11y,
-    openNodeLink, hasOpenableLink, isSafeLink, shortText, moveNodeInStackingOrder,
-    openNodesListPanel, closeNodesListPanel, buildNodesListPanel, refreshAllEdges,
-    deleteSelected, selectNode, selectEdge, clearSelection, applyTransform, fitNodeText,
-    version: APP_VERSION
-  };
-  // إشارة جاهزية للاختبارات ولأي أداة خارجية تنتظر المحرّر
-  window.__roadmapBuilderReady = true;
-  document.dispatchEvent(new CustomEvent('roadmap:ready', { detail:{ version: APP_VERSION } }));
 })();
 </script>
 <script type="module" src="./app.js"></script>

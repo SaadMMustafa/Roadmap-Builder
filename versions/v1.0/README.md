@@ -46,9 +46,6 @@
 - [x] Google sign-in (Firebase Auth), cloud save and a personal dashboard of your diagrams (Firestore)
 - [x] Live share links (`?share=token`) that read the diagram straight from the database — different from exporting, the shared view always reflects the latest saved version, and view-only mode hides all editing controls
 - [x] In-app toast / confirm / share-link dialogs (no default browser `alert`/`confirm`/`prompt`)
-- [x] Full local mode without any account (sign-in gate has a "continue locally" option), with JSON backup export/import of all local diagrams
-- [x] Keyboard accessibility: nodes reachable via Tab, Enter/Shift+Enter select, F2 edits, keyboard re-ordering in the node list, live screen-reader announcements
-- [x] Automated test suite (`npm test`) — editor boot, export pipeline, share-link persistence, Firestore rules consistency
 
 **Planned / not built yet**
 - [ ] Installable component/package (e.g. `npm install`) for embedding in another app — the project is currently a standalone web app, not a library
@@ -71,31 +68,23 @@
 
 ## 🚀 Quick Start
 
-Roadmap Builder is currently a **static web app**, not an npm package — there's nothing to install into another project (yet; see [Project Roadmap](#️-project-roadmap)).
+Roadmap Builder is currently a **static web app**, not an npm package — there's nothing to install into another project (yet; see [Project Roadmap](#️-project-roadmap)). To run it:
 
-### 1. Run it locally (the only step you actually need)
+### 1. Run it locally
 
-> ⚠️ Google sign-in will **not** work if you just double-click `index.html` (`file://`). It needs to be served over `http(s)://`. Everything else — the full editor, local save, export — works even from `file://`.
-
-```bash
-npm start
-```
-
-Then open `http://127.0.0.1:5173`. (No dependencies and no install step — `tools/serve.cjs` is a tiny static server shipped with the project. Prefer another server? `python -m http.server 5173` works the same.)
-
-**Trying it without any account:** on the sign-in screen, click **"المتابعة محليًا بدون سحابة"** — the app runs fully locally, diagrams are saved in your browser, and export works. Sign in later from the account drawer (👤) whenever you want cloud save and share links.
-
-### 2. Run the tests
+> ⚠️ Google sign-in will **not** work if you just double-click `index.html` (`file://`). It needs to be served over `http(s)://`.
 
 ```bash
-npm test
+git clone <your-repo-url>
+cd <repo-folder>
+python -m http.server 5173
 ```
 
-Runs the smoke suite + the export pipeline suite (27 checks total, zero dependencies): parses the inline editor script, verifies every DOM id the app layer needs, checks version consistency across files, regression-tests the share-link persistence fix and the cloud-save `createdAt` bug, and runs a full export cycle.
+Then open `http://localhost:5173`.
 
-### 3. Connect your own Firebase project (optional, for cloud save + sharing)
+### 2. Connect your own Firebase project (optional, for cloud save + sharing)
 
-The app works fully offline/local without this step (diagrams are kept in your browser, and can be exported/imported as a JSON backup from the account drawer). To enable Google sign-in, cloud save, and share links:
+The app works fully offline/local without this step (diagrams are kept in your browser). To enable Google sign-in, cloud save, and share links:
 
 1. Create a project in the [Firebase Console](https://console.firebase.google.com/).
 2. Enable **Authentication → Google** sign-in provider.
@@ -115,8 +104,7 @@ The app works fully offline/local without this step (diagrams are kept in your b
    export const ownerEmail = 'you@example.com'; // gets the "owner" role
    ```
 
-5. Publish the rules in `firestore.rules` to your Firestore project (deploy with `firebase deploy --only firestore:rules`, or paste them in the console).
-   > What the rules enforce: users create their profile once with a valid role (`owner`/`editor`) and can **never** change their role or email afterwards; diagrams are owner-only except public share reads; payload fields and document size are validated; updates can never change the owner or the creation date.
+5. Publish the rules in `firestore.rules` to your Firestore project.
 6. In **Authentication → Settings → Authorized domains**, add the domain you're hosting on (e.g. `USERNAME.github.io`, or `localhost` for local testing).
 
 ### 3. Deploy
@@ -204,7 +192,7 @@ There is no billing system yet — the project is free to self-host and use with
 ## 🤝 Contributing
 
 - **Run it locally:** see [Quick Start](#-quick-start) above.
-- **Run tests:** `npm test` — 27 checks across two suites (smoke + export pipeline), zero external dependencies. See [Quick Start](#-quick-start).
+- **Run tests:** *TODO — no automated test suite yet.*
 - **Contribution guidelines:** *TODO*
 - **Code of conduct:** *TODO*
 
